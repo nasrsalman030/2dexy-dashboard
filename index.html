@@ -237,6 +237,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--t1);line-height:1.
       <span class="clock" id="clock"></span>
       <button class="refresh-btn" onclick="refreshAll()">↻ Refresh</button>
     </div>
+    <div id="demo-banner" style="display:none;background:var(--or15);color:var(--or);text-align:center;padding:4px 12px;font-size:11px;font-weight:500">⚠️ Demo Mode — API unreachable. Connect to localhost:8082 or deploy backend for live data.</div>
   </div>
   <div class="content" id="content">
 
@@ -684,12 +685,16 @@ async function fetchHealth() {
   if (!d) {
     STATE.connected = false;
     $('status-dot').className = 'dot off';
-    $('status-text').textContent = 'disconnected';
-    log('API unreachable at ' + API, 'err');
+    $('status-text').textContent = 'demo mode';
+    $('demo-banner').style.display = 'block';
+    // Fill with demo health
+    d = DEMO.health;
+    log('API unreachable — demo mode active', 'warn');
     return;
   }
   STATE.connected = true;
   STATE.paperMode = !!d.paper_mode;
+  $('demo-banner').style.display = 'none';
   const ok = d.ready && d.hotpath_connected;
   $('status-dot').className = ok ? 'dot on' : 'dot off';
   $('status-text').textContent = ok ? 'connected' : 'degraded';
@@ -1010,8 +1015,70 @@ async function refreshAll() {
   STATE.lastRefresh = Date.now();
 }
 
+// ═══ DEMO MODE ═══
+const DEMO = {
+  health: { ready: true, hotpath_connected: true, paper_mode: true, autotrader_enabled: true, execution_mode: 'paper' },
+  telemetry: { observations_24h: 1247, training_samples: 7027, model_accuracy: 0.93, model_version: 'v12', precision: 0.84, recall: 0.32, f1_score: 0.47, model_samples: 7027, win_rate_traded: 0.68, win_rate_counterfactual: 0.61, sharpe_ratio: 0.82, sortino_ratio: 1.04, profit_factor: 1.35, max_drawdown: 0.042, total_return: 0.023, avg_win: 0.018, avg_loss: -0.011, best_trade: 0.12, worst_trade: -0.05 },
+  rug: { tokens_scanned: 8932, rugs_caught: 412, safe_passed: 7650, detection_rate: 0.844, false_alarm_rate: 4.7 },
+  wallet: { balance: 1.2347, total_pnl: 0.2347, paper_pnl: 0.2347, total_trades: 47, wins: 32, losses: 15, pnl_pct: 23.47 },
+  signals: [],
+  config: { risk_limits: { daily_loss_limit: 0.5, daily_loss_used: 0.087, max_position_size: 0.1 } }
+};
+
+// Generate demo signals
+(function() {
+  const tokens = ['BONK','WIF','POPCAT','MEW','BRETT','MOG','GIGA','TURBO','FLOKI','PEPE','MEME','NEIRO','GOAT','BOME','W'];
+  const now = Date.now();
+  for (let i = 0; i < 35; i++) {
+    const conf = 0.35 + Math.random() * 0.6;
+    DEMO.signals.push({
+      token: tokens[i % tokens.length] + Math.random().toString(36).slice(2, 6),
+      action: Math.random() > 0.4 ? 'buy' : 'sell',
+      confidence: conf,
+      score: conf * 0.8 + Math.random() * 0.2,
+      time: new Date(now - i * 180000).toISOString()
+    });
+  }
+  // Generate demo trades
+  DEMO.wallet.trades = [];
+  let eq = 1.0;
+  for (let i = 0; i < 47; i++) {
+    const win = Math.random() > 0.35;
+    const pnl = win ? (0.005 + Math.random() * 0.08) : -(0.002 + Math.random() * 0.04);
+    eq += pnl;
+    DEMO.wallet.trades.push({
+      token: tokens[i % tokens.length] + Math.random().toString(36).slice(2, 6),
+      side: i % 2 === 0 ? 'buy' : 'sell',
+      amount: 0.01 + Math.random() * 0.09,
+      pnl: pnl,
+      outcome: win ? 'win' : 'loss',
+      time: new Date(now - (47 - i) * 600000).toISOString()
+    });
+  }
+})();
+
+function isDemoMode() { return !STATE.connected; }
+
+// Override api() to fall back to demo data
+const _api = async (url) => {
+  const r = await fetch(API + url, { signal: AbortSignal.timeout(2000) }).then(r => r.ok ? r.json() : null).catch(() => null);
+  if (r !== null) return r;
+  // Fallback to demo
+  if (!STATE.demoWarned) { log('API unreachable — running in demo mode', 'warn'); STATE.demoWarned = true; }
+  if (url.includes('/health')) return DEMO.health;
+  if (url.includes('/telemetry')) return DEMO.telemetry;
+  if (url.includes('/autotrader/status')) return DEMO.telemetry;
+  if (url.includes('/learning')) return DEMO.telemetry;
+  if (url.includes('/wallet')) return DEMO.wallet;
+  if (url.includes('/rug/stats')) return DEMO.rug;
+  if (url.includes('/autotrader/recent-signals')) return DEMO.signals;
+  if (url.includes('/autotrader/config')) return DEMO.config;
+  return null;
+};
+
 // ═══ INIT ═══
-log('WebUI v2.0 initialized — API: ' + API, 'ok');
+const api = API === 'http://127.0.0.1:8082' ? _api : _api;
+log('WebUI v2.0 initialized — API: ' + API + (API.includes('127.0.0.1') ? ' (demo fallback active)' : ''), 'ok');
 refreshAll();
 setInterval(refreshAll, REFRESH_MS);
 
