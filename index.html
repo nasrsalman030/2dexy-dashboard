@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2DEXY</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0d1117;--surface:#161b22;--border:#21262d;--border2:#30363d;
+  --t1:#e6edf3;--t2:#8b949e;--t3:#484f58;
+  --gn:#3fb950;--gn15:rgba(63,185,80,.15);
+  --rd:#f85149;--rd15:rgba(248,81,73,.15);
+  --bl:#58a6ff;--bl15:rgba(88,166,255,.15);
+  --or:#d29922;--or15:rgba(210,153,34,.15);
+  --mono:'SF Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+}
+body{font-family:var(--sans);background:var(--bg);color:var(--t1);line-height:1.5;min-height:100vh}
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border)}
+.hdr h1{font-size:13px;font-weight:600;letter-spacing:.02em;display:flex;align-items:center;gap:6px}
+.hdr h1 span{color:var(--t3);font-weight:400;font-size:11px}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--gn);display:inline-block;animation:p 2s infinite}
+.dot.off{background:var(--rd);animation:none}
+@keyframes p{0%,100%{opacity:1}50%{opacity:.35}}
+.hdr-r{display:flex;align-items:center;gap:12px;font-size:11px;color:var(--t2)}
+.tag{padding:1px 7px;border-radius:8px;font-size:10px;font-weight:500;font-family:var(--mono);letter-spacing:.03em}
+.tag-paper{background:var(--bl15);color:var(--bl)}
+.tag-live{background:var(--gn15);color:var(--gn)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;padding:14px 16px;max-width:1200px;margin:0 auto}
+.c{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:14px}
+.ch{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.ch h2{font-size:11px;font-weight:500;color:var(--t2);text-transform:uppercase;letter-spacing:.05em}
+.ch .b{font-size:9px;padding:1px 5px;border-radius:4px;font-family:var(--mono)}
+.r{display:flex;align-items:baseline;gap:6px;margin-bottom:6px}.r:last-child{margin-bottom:0}
+.r .v{font-family:var(--mono);font-size:18px;font-weight:600}
+.r .v.s{font-size:13px}
+.r .l{font-size:12px;color:var(--t2);flex:1}
+.r .d{font-size:10px;font-family:var(--mono);padding:1px 4px;border-radius:3px}
+.du{background:var(--gn15);color:var(--gn)}.dd{background:var(--rd15);color:var(--rd)}.df{background:var(--bl15);color:var(--bl)}
+.hl{list-style:none}.hl li{display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px}.hl li:last-child{border:none}
+.hl .i{width:5px;height:5px;border-radius:50%;flex-shrink:0}.hl .n{flex:1}
+.fd{max-height:300px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.fd::-webkit-scrollbar{width:3px}.fd::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.sg{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:11px}.sg:last-child{border:none}
+.sg .tk{font-family:var(--mono);font-weight:500;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sg .cf{font-family:var(--mono);font-size:10px;padding:1px 5px;border-radius:3px}
+.sg .tm{color:var(--t3);font-size:10px;font-family:var(--mono);margin-left:auto}
+.bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:3px}
+.bar-f{height:100%;border-radius:2px;transition:width .5s ease}
+.ftr{text-align:center;padding:10px;font-size:10px;color:var(--t3);border-top:1px solid var(--border)}
+.ftr .a{font-family:var(--mono)}
+@media(max-width:600px){.grid{padding:10px}.hdr{padding:8px 10px}.c{padding:10px}.r .v{font-size:15px}}
+.rx{opacity:.5;pointer-events:none}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <h1>2DEXY <span>dashboard</span></h1>
+  <div class="hdr-r">
+    <span id="mt" class="tag tag-paper">paper</span>
+    <span id="ck" style="font-family:var(--mono);font-size:10px"></span>
+  </div>
+</div>
+<div class="grid">
+  <div class="c"><div class="ch"><h2>System</h2><span class="dot" id="sd"></span></div><ul class="hl" id="hl"><li><div class="i" style="background:var(--t3)"></div><span class="n">Loading…</span></li></ul></div>
+  <div class="c"><div class="ch"><h2>Trading</h2></div>
+    <div class="r"><span class="l">Win Rate</span><span class="v" id="wr">—</span></div>
+    <div class="r"><span class="l">Observations (24h)</span><span class="v s" id="ob">—</span></div>
+    <div class="r"><span class="l">Training Samples</span><span class="v s" id="sa">—</span></div>
+    <div class="r"><span class="l">Model Accuracy</span><span class="v s" id="ac">—</span></div>
+    <div class="r"><span class="l">Mode</span><span class="v s" id="em">—</span></div>
+  </div>
+  <div class="c"><div class="ch"><h2>Model</h2><span class="b" style="background:var(--gn15);color:var(--gn)" id="mv">v12</span></div>
+    <div class="r"><span class="l">Precision</span><span class="v s" id="pr">—</span></div>
+    <div class="r"><span class="l">Recall</span><span class="v s" id="rc">—</span></div>
+    <div class="r"><span class="l">F1</span><span class="v s" id="f1">—</span></div>
+    <div class="r"><span class="l">Samples</span><span class="v s" id="ms">—</span></div>
+    <div style="margin-top:6px">
+      <div class="r" style="margin-bottom:1px"><span class="l">Traded</span><span class="v s" id="wt">—</span></div>
+      <div class="bar"><div class="bar-f" id="wb" style="width:0;background:var(--gn)"></div></div>
+      <div class="r" style="margin-top:4px;margin-bottom:1px"><span class="l">Counterfactual</span><span class="v s" id="wc">—</span></div>
+      <div class="bar"><div class="bar-f" id="cb" style="width:0;background:var(--bl)"></div></div>
+    </div>
+  </div>
+  <div class="c"><div class="ch"><h2>Rug Detector</h2><span class="b" style="background:var(--or15);color:var(--or)">ONNX</span></div>
+    <div class="r"><span class="l">Scanned</span><span class="v s" id="rt">—</span></div>
+    <div class="r"><span class="l">Caught</span><span class="v s" id="rg" style="color:var(--rd)">—</span></div>
+    <div class="r"><span class="l">Safe</span><span class="v s" id="rs" style="color:var(--gn)">—</span></div>
+    <div class="r"><span class="l">False Alarm</span><span class="v s" id="rf">—</span></div>
+    <div style="margin-top:6px"><div class="r" style="margin-bottom:1px"><span class="l">Detection</span></div><div class="bar"><div class="bar-f" id="rb" style="width:0;background:var(--gn)"></div></div></div>
+  </div>
+  <div class="c"><div class="ch"><h2>Signals</h2><span id="sc" style="font-family:var(--mono);font-size:10px;color:var(--t3)">0</span></div>
+    <div class="fd" id="sf"><div class="sg" style="color:var(--t3);justify-content:center;padding:16px 0">Waiting…</div></div>
+  </div>
+  <div class="c"><div class="ch"><h2>Risk</h2></div>
+    <div class="r"><span class="l">Daily Limit</span><span class="v s" id="rl">—</span></div>
+    <div class="r"><span class="l">Used</span><span class="v s" id="ru">—</span></div>
+    <div class="r"><span class="l">Max Position</span><span class="v s" id="rp">—</span></div>
+    <div style="margin-top:6px"><div class="r" style="margin-bottom:1px"><span class="l">Budget</span></div><div class="bar"><div class="bar-f" id="rb2" style="width:0;background:var(--gn)"></div></div></div>
+  </div>
+</div>
+<div class="ftr"><span class="a" id="au">localhost:8082</span> · <span id="up">—</span> · 5s</div>
+<script>
+const A=location.hostname==='localhost'||!location.hostname?'http://127.0.0.1:8082':location.origin;
+const $=id=>document.getElementById(id);
+const ck=()=>{$('ck').textContent=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'})};
+setInterval(ck,1000);ck();
+const S={sigs:[],t0:Date.now()};
+async function g(u){try{return await fetch(u,{signal:AbortSignal.timeout(3000)}).then(r=>r.json())}catch(e){return null}}
+async function fH(){
+  const d=await g(A+'/health');if(!d){$('sd').className='dot off';$('hl').innerHTML='<li><div class="i" style="background:var(--rd)"></div><span class="n">unreachable</span></li>';return}
+  const ok=d.ready&&d.hotpath_connected;
+  $('sd').className=ok?'dot':'dot off';
+  $('mt').textContent=d.paper_mode?'paper':'live';
+  $('mt').className=d.paper_mode?'tag tag-paper':'tag tag-live';
+  $('em').textContent=d.execution_mode||d.autotrader_state||'—';
+  [{n:'API',o:true},{n:'HotPath',o:!!d.hotpath_connected},{n:'Ready',o:!!d.ready},{n:'Trader',o:!!d.autotrader_enabled}]
+  .forEach(i=>$('hl').innerHTML+=`<li><div class="i" style="background:${i.o?'var(--gn)':'var(--rd)'}"></div><span class="n">${i.n}</span></li>`);
+  $('hl').querySelector('.i[style*=t3]')?.parentElement?.remove();
+}
+async function fM(){
+  const[t,a,l]=await Promise.all([g(A+'/telemetry/stats'),g(A+'/autotrader/status'),g(A+'/learning/metrics')]);
+  const m=v=>v!=null;
+  if(a){
+    if(m(a.win_rate)){$('wr').textContent=(a.win_rate*100).toFixed(1)+'%'}
+    if(m(a.paper_pnl)){const p=a.paper_pnl;$('wr').insertAdjacentHTML('afterend','')}
+  }
+  if(t){
+    if(m(t.observations_24h))$('ob').textContent=t.observations_24h.toLocaleString();
+    if(m(t.training_samples))$('sa').textContent=t.training_samples.toLocaleString();
+    if(m(t.model_accuracy))$('ac').textContent=(t.model_accuracy*100).toFixed(0)+'%';
+    if(t.model_version)$('mv').textContent=t.model_version;
+    if(m(t.precision))$('pr').textContent=(t.precision*100).toFixed(1)+'%';
+    if(m(t.recall))$('rc').textContent=(t.recall*100).toFixed(1)+'%';
+    if(m(t.f1_score))$('f1').textContent=(t.f1_score*100).toFixed(1)+'%';
+    if(m(t.model_samples))$('ms').textContent=t.model_samples.toLocaleString();
+    if(m(t.win_rate_traded)){$('wt').textContent=(t.win_rate_traded*100).toFixed(0)+'%';$('wb').style.width=(t.win_rate_traded*100)+'%'}
+    if(m(t.win_rate_counterfactual)){$('wc').textContent=(t.win_rate_counterfactual*100).toFixed(0)+'%';$('cb').style.width=(t.win_rate_counterfactual*100)+'%'}
+  }
+  if(l){
+    if(m(l.observation_count_24h))$('ob').textContent=l.observation_count_24h.toLocaleString();
+    if(m(l.training_sample_count))$('sa').textContent=l.training_sample_count.toLocaleString();
+    if(m(l.model_accuracy))$('ac').textContent=(l.model_accuracy*100).toFixed(0)+'%';
+    if(m(l.win_rate_traded)){$('wt').textContent=(l.win_rate_traded*100).toFixed(0)+'%';$('wb').style.width=(l.win_rate_traded*100)+'%'}
+    if(m(l.win_rate_counterfactual)){$('wc').textContent=(l.win_rate_counterfactual*100).toFixed(0)+'%';$('cb').style.width=(l.win_rate_counterfactual*100)+'%'}
+  }
+  const u=Math.floor((Date.now()-S.t0)/1000);
+  $('up').textContent='up '+(u<60?u+'s':u<3600?Math.floor(u/60)+'m':Math.floor(u/3600)+'h');
+}
+async function fR(){const d=await g(A+'/rug/stats');if(!d)return;
+  $('rt').textContent=(d.tokens_scanned||d.total||0).toLocaleString();
+  $('rg').textContent=(d.rugs_caught||d.caught||0).toLocaleString();
+  $('rs').textContent=(d.safe_passed||d.safe||0).toLocaleString();
+  $('rf').textContent=(d.false_alarm_rate||d.far||0).toFixed(1)+'%';
+  const r=d.detection_rate||d.recall||0;$('rb').style.width=(r*100)+'%';
+}
+async function fS(){
+  const d=await g(A+'/autotrader/recent-signals');if(!Array.isArray(d)||!d.length)return;
+  const ex=new Set(S.sigs.map(s=>s.token||s.id));
+  d.forEach(s=>{const id=s.token||s.id;if(!ex.has(id)){S.sigs.unshift(s);ex.add(id)}});
+  S.sigs=S.sigs.slice(0,50);$('sc').textContent=S.sigs.length;
+  $('sf').innerHTML=S.sigs.map(s=>{
+    const c=(s.confidence||s.score||0)*100,b=s.action==='buy'||s.signal==='buy';
+    return`<div class="sg"><span class="tk" title="${s.token||''}">${(s.token||s.name||'???').slice(0,8)}</span><span class="cf" style="background:${c>70?'var(--gn15)':c>50?'var(--or15)':'var(--border)'};color:${c>70?'var(--gn)':c>50?'var(--or)':'var(--t2)'}">${c.toFixed(0)}%</span><span style="color:${b?'var(--gn)':'var(--t2)'};font-size:10px">${s.action||s.signal||'—'}</span><span class="tm">${s.time||s.ts||''}</span></div>`
+  }).join('');
+}
+async function fK(){
+  const d=await g(A+'/admin/config');
+  if(d){const r=d.risk||d.risk_limits||{};$('rl').textContent=(r.daily_loss_limit||r.max_daily_loss||'—')+' SOL';$('ru').textContent=(r.daily_loss_used||0).toFixed(4)+' SOL';$('rp').textContent=(r.max_position_size||r.position_limit||'—')+' SOL';
+    const p=r.daily_loss_used&&r.daily_loss_limit?Math.min(r.daily_loss_used/r.daily_loss_limit*100,100):0;$('rb2').style.width=p+'%';$('rb2').style.background=p>80?'var(--rd)':p>50?'var(--or)':'var(--gn)'}
+  else{const d2=await g(A+'/autotrader/config');if(d2){const r=d2.risk_limits||d2.risk||{};$('rl').textContent=(r.daily_loss_limit||'—')+' SOL';$('rp').textContent=(r.max_position_size||'—')+' SOL'}}
+}
+async function go(){document.body.classList.add('rx');await Promise.allSettled([fH(),fM(),fR(),fS(),fK()]);document.body.classList.remove('rx')}
+go();setInterval(go,5000);
+</script>
+</body>
+</html>
