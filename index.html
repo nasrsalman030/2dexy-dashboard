@@ -3,176 +3,1024 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>2DEXY</title>
+<title>2DEXY — Trading Terminal</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --bg:#0d1117;--surface:#161b22;--border:#21262d;--border2:#30363d;
+  --bg:#0a0e14;--surface:#111820;--surface2:#161d27;--border:#1e2a3a;--border2:#2a3a4e;
   --t1:#e6edf3;--t2:#8b949e;--t3:#484f58;
-  --gn:#3fb950;--gn15:rgba(63,185,80,.15);
-  --rd:#f85149;--rd15:rgba(248,81,73,.15);
-  --bl:#58a6ff;--bl15:rgba(88,166,255,.15);
-  --or:#d29922;--or15:rgba(210,153,34,.15);
-  --mono:'SF Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --gn:#3fb950;--gn15:rgba(63,185,80,.12);--gn25:rgba(63,185,80,.25);
+  --rd:#f85149;--rd15:rgba(248,81,73,.12);--rd25:rgba(248,81,73,.25);
+  --bl:#58a6ff;--bl15:rgba(88,166,255,.12);
+  --or:#d29922;--or15:rgba(210,153,34,.12);
+  --pu:#a371f7;--pu15:rgba(163,113,247,.12);
+  --cy:#39d2c0;--cy15:rgba(57,210,192,.12);
+  --mono:'SF Mono',ui-monospace,SFMono-Regular,'Cascadia Code',Menlo,Consolas,monospace;
   --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  --radius:8px;--radius-sm:5px;
+  --sidebar-w:220px;
 }
-body{font-family:var(--sans);background:var(--bg);color:var(--t1);line-height:1.5;min-height:100vh}
-.hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border)}
-.hdr h1{font-size:13px;font-weight:600;letter-spacing:.02em;display:flex;align-items:center;gap:6px}
-.hdr h1 span{color:var(--t3);font-weight:400;font-size:11px}
-.dot{width:6px;height:6px;border-radius:50%;background:var(--gn);display:inline-block;animation:p 2s infinite}
-.dot.off{background:var(--rd);animation:none}
-@keyframes p{0%,100%{opacity:1}50%{opacity:.35}}
-.hdr-r{display:flex;align-items:center;gap:12px;font-size:11px;color:var(--t2)}
-.tag{padding:1px 7px;border-radius:8px;font-size:10px;font-weight:500;font-family:var(--mono);letter-spacing:.03em}
-.tag-paper{background:var(--bl15);color:var(--bl)}
-.tag-live{background:var(--gn15);color:var(--gn)}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;padding:14px 16px;max-width:1200px;margin:0 auto}
-.c{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:14px}
-.ch{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
-.ch h2{font-size:11px;font-weight:500;color:var(--t2);text-transform:uppercase;letter-spacing:.05em}
-.ch .b{font-size:9px;padding:1px 5px;border-radius:4px;font-family:var(--mono)}
-.r{display:flex;align-items:baseline;gap:6px;margin-bottom:6px}.r:last-child{margin-bottom:0}
-.r .v{font-family:var(--mono);font-size:18px;font-weight:600}
-.r .v.s{font-size:13px}
-.r .l{font-size:12px;color:var(--t2);flex:1}
-.r .d{font-size:10px;font-family:var(--mono);padding:1px 4px;border-radius:3px}
-.du{background:var(--gn15);color:var(--gn)}.dd{background:var(--rd15);color:var(--rd)}.df{background:var(--bl15);color:var(--bl)}
-.hl{list-style:none}.hl li{display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px}.hl li:last-child{border:none}
-.hl .i{width:5px;height:5px;border-radius:50%;flex-shrink:0}.hl .n{flex:1}
-.fd{max-height:300px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
-.fd::-webkit-scrollbar{width:3px}.fd::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
-.sg{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:11px}.sg:last-child{border:none}
-.sg .tk{font-family:var(--mono);font-weight:500;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.sg .cf{font-family:var(--mono);font-size:10px;padding:1px 5px;border-radius:3px}
-.sg .tm{color:var(--t3);font-size:10px;font-family:var(--mono);margin-left:auto}
-.bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:3px}
-.bar-f{height:100%;border-radius:2px;transition:width .5s ease}
-.ftr{text-align:center;padding:10px;font-size:10px;color:var(--t3);border-top:1px solid var(--border)}
-.ftr .a{font-family:var(--mono)}
-@media(max-width:600px){.grid{padding:10px}.hdr{padding:8px 10px}.c{padding:10px}.r .v{font-size:15px}}
-.rx{opacity:.5;pointer-events:none}
+body{font-family:var(--sans);background:var(--bg);color:var(--t1);line-height:1.5;overflow:hidden;height:100vh;display:flex}
+
+/* ── Sidebar ── */
+.sb{width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;z-index:10;transition:transform .2s ease}
+.sb-logo{padding:20px 16px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border)}
+.sb-logo h1{font-size:16px;font-weight:700;letter-spacing:-.02em}
+.sb-logo span{font-size:10px;color:var(--t3);font-weight:400;margin-top:2px;display:block;letter-spacing:.04em;text-transform:uppercase}
+.sb-logo .ico{width:32px;height:32px;border-radius:var(--radius);background:linear-gradient(135deg,var(--gn),#0d8a3e);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;flex-shrink:0}
+.sb-nav{flex:1;padding:12px 8px;overflow-y:auto}
+.sb-sec{margin-bottom:16px}
+.sb-sec-title{font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;padding:0 8px 6px}
+.sb-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius-sm);font-size:13px;font-weight:450;color:var(--t2);cursor:pointer;transition:all .15s ease;margin-bottom:1px;user-select:none}
+.sb-item:hover{background:var(--surface2);color:var(--t1)}
+.sb-item.active{background:var(--gn15);color:var(--gn)}
+.sb-item .ic{width:18px;text-align:center;font-size:14px;opacity:.7}
+.sb-item.active .ic{opacity:1}
+.sb-item .badge{margin-left:auto;font-size:10px;font-family:var(--mono);padding:1px 6px;border-radius:9px;background:var(--border);color:var(--t2)}
+.sb-item.active .badge{background:var(--gn25);color:var(--gn)}
+.sb-status{padding:12px 16px;border-top:1px solid var(--border);font-size:11px}
+.sb-status .dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:6px;vertical-align:middle;animation:pulse 2s infinite}
+.sb-status .dot.on{background:var(--gn)}.sb-status .dot.off{background:var(--rd);animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.sb-status .mode{display:inline-block;margin-left:8px;padding:1px 6px;border-radius:4px;font-size:9px;font-family:var(--mono);font-weight:600;letter-spacing:.04em}
+.sb-status .mode.paper{background:var(--bl15);color:var(--bl)}
+.sb-status .mode.live{background:var(--gn15);color:var(--gn)}
+
+/* ── Main ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.topbar{height:48px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 20px;flex-shrink:0;background:var(--surface)}
+.topbar h2{font-size:14px;font-weight:600}
+.topbar-r{display:flex;align-items:center;gap:16px;font-size:12px;color:var(--t2)}
+.topbar-r .clock{font-family:var(--mono);font-size:11px;color:var(--t3)}
+.topbar-r .refresh-btn{background:var(--surface2);border:1px solid var(--border);color:var(--t2);padding:4px 10px;border-radius:var(--radius-sm);font-size:11px;cursor:pointer;font-family:var(--sans);transition:all .15s}
+.topbar-r .refresh-btn:hover{background:var(--border);color:var(--t1)}
+.content{flex:1;overflow-y:auto;overflow-x:hidden;padding:20px;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.content::-webkit-scrollbar{width:5px}.content::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* ── Page container ── */
+.page{display:none}.page.active{display:block}
+
+/* ── Stat cards row ── */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:20px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.stat-card.green::before{background:var(--gn)}.stat-card.red::before{background:var(--rd)}
+.stat-card.blue::before{background:var(--bl)}.stat-card.orange::before{background:var(--or)}
+.stat-card.purple::before{background:var(--pu)}.stat-card.cyan::before{background:var(--cy)}
+.sc-label{font-size:11px;color:var(--t2);text-transform:uppercase;letter-spacing:.05em;font-weight:500;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.sc-label .sc-icon{font-size:13px;opacity:.6}
+.sc-val{font-family:var(--mono);font-size:24px;font-weight:700;line-height:1.2}
+.sc-val.sm{font-size:16px}
+.sc-sub{font-size:11px;color:var(--t3);margin-top:4px;font-family:var(--mono)}
+.sc-sub .up{color:var(--gn)}.sc-sub .dn{color:var(--rd)}
+.sc-change{font-size:10px;padding:2px 6px;border-radius:3px;font-family:var(--mono);font-weight:600}
+.sc-change.up{background:var(--gn15);color:var(--gn)}.sc-change.dn{background:var(--rd15);color:var(--rd)}
+
+/* ── Panels ── */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px;overflow:hidden}
+.panel-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none}
+.panel-hdr:hover{background:var(--surface2)}
+.panel-hdr h3{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}
+.panel-hdr h3 .ph-icon{opacity:.5;font-size:14px}
+.panel-hdr .ph-right{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--t2)}
+.panel-hdr .ph-badge{padding:2px 8px;border-radius:10px;font-size:10px;font-family:var(--mono);font-weight:500}
+.panel-body{padding:16px}
+.panel-body.pad0{padding:0}
+
+/* ── Table ── */
+.tbl{width:100%;border-collapse:collapse;font-size:12px}
+.tbl th{text-align:left;padding:8px 12px;font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:1}
+.tbl td{padding:8px 12px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px;white-space:nowrap}
+.tbl tr:hover td{background:var(--surface2)}
+.tbl .token{font-weight:600;color:var(--t1)}
+.tbl .buy{color:var(--gn)}.tbl .sell{color:var(--rd)}
+.tbl .conf{padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600}
+.tbl .conf.high{background:var(--gn15);color:var(--gn)}.tbl .conf.med{background:var(--or15);color:var(--or)}
+.tbl .conf.low{background:var(--border);color:var(--t3)}
+.tbl-wrap{max-height:400px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.tbl-wrap::-webkit-scrollbar{width:4px}.tbl-wrap::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+/* ── Sparkline (pure CSS) ── */
+.spark{display:flex;align-items:flex-end;gap:1px;height:32px;padding:4px 0}
+.spark .bar{width:3px;border-radius:1px;background:var(--gn);transition:height .3s ease;min-height:1px}
+
+/* ── Grid layouts ── */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.grid-2-1{display:grid;grid-template-columns:2fr 1fr;gap:16px}
+@media(max-width:900px){.grid-2,.grid-2-1{grid-template-columns:1fr}}
+
+/* ── Control buttons ── */
+.btn{padding:6px 14px;border-radius:var(--radius-sm);font-size:12px;font-weight:500;border:1px solid var(--border);background:var(--surface2);color:var(--t2);cursor:pointer;transition:all .15s;font-family:var(--sans)}
+.btn:hover{background:var(--border);color:var(--t1)}
+.btn.primary{background:var(--gn);border-color:var(--gn);color:#fff}.btn.primary:hover{background:#2ea043}
+.btn.danger{background:var(--rd);border-color:var(--rd);color:#fff}.btn.danger:hover{background:#da3633}
+.btn.sm{padding:3px 10px;font-size:11px}
+
+/* ── Toggle ── */
+.toggle{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2);cursor:pointer}
+.toggle .track{width:32px;height:18px;border-radius:9px;background:var(--border);position:relative;transition:background .2s}
+.toggle .track::after{content:'';position:absolute;width:14px;height:14px;border-radius:50%;background:var(--t2);top:2px;left:2px;transition:all .2s}
+.toggle.on .track{background:var(--gn)}.toggle.on .track::after{left:16px;background:#fff}
+
+/* ── Metric grid ── */
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+.metric{background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px}
+.metric .m-label{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.04em}
+.metric .m-val{font-family:var(--mono);font-size:16px;font-weight:600;margin-top:2px}
+
+/* ── Log feed ── */
+.log{font-family:var(--mono);font-size:11px;line-height:1.7;padding:0}
+.log .entry{padding:4px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px}
+.log .entry:hover{background:var(--surface2)}
+.log .ts{color:var(--t3);flex-shrink:0;min-width:70px}
+.log .lvl{flex-shrink:0;min-width:40px;font-weight:600}
+.log .lvl.info{color:var(--bl)}.log .lvl.ok{color:var(--gn)}.log .lvl.warn{color:var(--or)}.log .lvl.err{color:var(--rd)}
+.log .msg{color:var(--t2);flex:1}
+
+/* ── Chart area (text-based) ── */
+.chart-area{height:160px;position:relative;border-bottom:1px solid var(--border)}
+.chart-grid{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none}
+.chart-grid span{font-size:9px;font-family:var(--mono);color:var(--t3);padding-left:4px}
+.chart-bars{display:flex;align-items:flex-end;gap:2px;height:100%;padding:0 4px 0 40px}
+.chart-bars .cb{flex:1;border-radius:2px 2px 0 0;transition:height .4s ease;min-width:2px;position:relative}
+.chart-bars .cb.gn{background:var(--gn)}.chart-bars .cb.rd{background:var(--rd)}
+.chart-bars .cb:hover{opacity:.8}
+
+/* ── Empty state ── */
+.empty{text-align:center;padding:40px 20px;color:var(--t3);font-size:13px}
+.empty .e-icon{font-size:32px;margin-bottom:12px;opacity:.4}
+
+/* ── Responsive ── */
+.mobile-toggle{display:none;position:fixed;top:10px;left:10px;z-index:20;width:36px;height:36px;border-radius:var(--radius-sm);background:var(--surface);border:1px solid var(--border);color:var(--t1);font-size:16px;cursor:pointer;align-items:center;justify-content:center}
+@media(max-width:768px){
+  .sb{position:fixed;left:0;top:0;bottom:0;transform:translateX(-100%);z-index:30}
+  .sb.open{transform:translateX(0)}
+  .mobile-toggle{display:flex}
+  .topbar{padding-left:52px}
+}
+
+/* ── Loading shimmer ── */
+.loading{position:relative;overflow:hidden}
+.loading::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.03),transparent);animation:shimmer 1.5s infinite}
+@keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+
+/* ── Fade in ── */
+.fade-in{animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 </style>
 </head>
 <body>
-<div class="hdr">
-  <h1>2DEXY <span>dashboard</span></h1>
-  <div class="hdr-r">
-    <span id="mt" class="tag tag-paper">paper</span>
-    <span id="ck" style="font-family:var(--mono);font-size:10px"></span>
-  </div>
-</div>
-<div class="grid">
-  <div class="c"><div class="ch"><h2>System</h2><span class="dot" id="sd"></span></div><ul class="hl" id="hl"><li><div class="i" style="background:var(--t3)"></div><span class="n">Loading…</span></li></ul></div>
-  <div class="c"><div class="ch"><h2>Trading</h2></div>
-    <div class="r"><span class="l">Win Rate</span><span class="v" id="wr">—</span></div>
-    <div class="r"><span class="l">Observations (24h)</span><span class="v s" id="ob">—</span></div>
-    <div class="r"><span class="l">Training Samples</span><span class="v s" id="sa">—</span></div>
-    <div class="r"><span class="l">Model Accuracy</span><span class="v s" id="ac">—</span></div>
-    <div class="r"><span class="l">Mode</span><span class="v s" id="em">—</span></div>
-  </div>
-  <div class="c"><div class="ch"><h2>Model</h2><span class="b" style="background:var(--gn15);color:var(--gn)" id="mv">v12</span></div>
-    <div class="r"><span class="l">Precision</span><span class="v s" id="pr">—</span></div>
-    <div class="r"><span class="l">Recall</span><span class="v s" id="rc">—</span></div>
-    <div class="r"><span class="l">F1</span><span class="v s" id="f1">—</span></div>
-    <div class="r"><span class="l">Samples</span><span class="v s" id="ms">—</span></div>
-    <div style="margin-top:6px">
-      <div class="r" style="margin-bottom:1px"><span class="l">Traded</span><span class="v s" id="wt">—</span></div>
-      <div class="bar"><div class="bar-f" id="wb" style="width:0;background:var(--gn)"></div></div>
-      <div class="r" style="margin-top:4px;margin-bottom:1px"><span class="l">Counterfactual</span><span class="v s" id="wc">—</span></div>
-      <div class="bar"><div class="bar-f" id="cb" style="width:0;background:var(--bl)"></div></div>
+
+<!-- Mobile menu toggle -->
+<button class="mobile-toggle" onclick="document.querySelector('.sb').classList.toggle('open')">☰</button>
+
+<!-- ═══ Sidebar ═══ -->
+<aside class="sb" id="sidebar">
+  <div class="sb-logo">
+    <div class="ico">2D</div>
+    <div>
+      <h1>2DEXY</h1>
+      <span>Trading Terminal</span>
     </div>
   </div>
-  <div class="c"><div class="ch"><h2>Rug Detector</h2><span class="b" style="background:var(--or15);color:var(--or)">ONNX</span></div>
-    <div class="r"><span class="l">Scanned</span><span class="v s" id="rt">—</span></div>
-    <div class="r"><span class="l">Caught</span><span class="v s" id="rg" style="color:var(--rd)">—</span></div>
-    <div class="r"><span class="l">Safe</span><span class="v s" id="rs" style="color:var(--gn)">—</span></div>
-    <div class="r"><span class="l">False Alarm</span><span class="v s" id="rf">—</span></div>
-    <div style="margin-top:6px"><div class="r" style="margin-bottom:1px"><span class="l">Detection</span></div><div class="bar"><div class="bar-f" id="rb" style="width:0;background:var(--gn)"></div></div></div>
+  <nav class="sb-nav">
+    <div class="sb-sec">
+      <div class="sb-sec-title">Overview</div>
+      <div class="sb-item active" data-page="dashboard" onclick="nav(this)">
+        <span class="ic">📊</span> Dashboard
+      </div>
+      <div class="sb-item" data-page="trades" onclick="nav(this)">
+        <span class="ic">📋</span> Trades
+        <span class="badge" id="trade-count">0</span>
+      </div>
+      <div class="sb-item" data-page="signals" onclick="nav(this)">
+        <span class="ic">📡</span> Signals
+        <span class="badge" id="signal-count">0</span>
+      </div>
+    </div>
+    <div class="sb-sec">
+      <div class="sb-sec-title">Analytics</div>
+      <div class="sb-item" data-page="model" onclick="nav(this)">
+        <span class="ic">🧠</span> Model
+      </div>
+      <div class="sb-item" data-page="rug" onclick="nav(this)">
+        <span class="ic">🛡️</span> Rug Detector
+      </div>
+      <div class="sb-item" data-page="performance" onclick="nav(this)">
+        <span class="ic">📈</span> Performance
+      </div>
+    </div>
+    <div class="sb-sec">
+      <div class="sb-sec-title">System</div>
+      <div class="sb-item" data-page="controls" onclick="nav(this)">
+        <span class="ic">⚙️</span> Controls
+      </div>
+      <div class="sb-item" data-page="logs" onclick="nav(this)">
+        <span class="ic">📝</span> Logs
+      </div>
+    </div>
+  </nav>
+  <div class="sb-status">
+    <span class="dot off" id="status-dot"></span>
+    <span id="status-text">connecting…</span>
+    <span class="mode paper" id="status-mode">PAPER</span>
+    <div style="margin-top:6px;font-family:var(--mono);font-size:10px;color:var(--t3)" id="sb-uptime"></div>
   </div>
-  <div class="c"><div class="ch"><h2>Signals</h2><span id="sc" style="font-family:var(--mono);font-size:10px;color:var(--t3)">0</span></div>
-    <div class="fd" id="sf"><div class="sg" style="color:var(--t3);justify-content:center;padding:16px 0">Waiting…</div></div>
+</aside>
+
+<!-- ═══ Main ═══ -->
+<div class="main">
+  <div class="topbar">
+    <h2 id="page-title">Dashboard</h2>
+    <div class="topbar-r">
+      <span class="clock" id="clock"></span>
+      <button class="refresh-btn" onclick="refreshAll()">↻ Refresh</button>
+    </div>
   </div>
-  <div class="c"><div class="ch"><h2>Risk</h2></div>
-    <div class="r"><span class="l">Daily Limit</span><span class="v s" id="rl">—</span></div>
-    <div class="r"><span class="l">Used</span><span class="v s" id="ru">—</span></div>
-    <div class="r"><span class="l">Max Position</span><span class="v s" id="rp">—</span></div>
-    <div style="margin-top:6px"><div class="r" style="margin-bottom:1px"><span class="l">Budget</span></div><div class="bar"><div class="bar-f" id="rb2" style="width:0;background:var(--gn)"></div></div></div>
+  <div class="content" id="content">
+
+    <!-- ═══ DASHBOARD PAGE ═══ -->
+    <div class="page active fade-in" id="page-dashboard">
+      <div class="stats-row" id="dash-stats">
+        <div class="stat-card green loading">
+          <div class="sc-label"><span class="sc-icon">💰</span> Paper Balance</div>
+          <div class="sc-val" id="d-balance">—</div>
+          <div class="sc-sub" id="d-pnl"></div>
+        </div>
+        <div class="stat-card blue loading">
+          <div class="sc-label"><span class="sc-icon">🎯</span> Win Rate</div>
+          <div class="sc-val" id="d-winrate">—</div>
+          <div class="sc-sub" id="d-trades">0 trades</div>
+        </div>
+        <div class="stat-card cyan loading">
+          <div class="sc-label"><span class="sc-icon">👁️</span> Observations (24h)</div>
+          <div class="sc-val sm" id="d-obs">—</div>
+          <div class="sc-sub" id="d-samples"></div>
+        </div>
+        <div class="stat-card orange loading">
+          <div class="sc-label"><span class="sc-icon">🧠</span> Model</div>
+          <div class="sc-val sm" id="d-model">v12</div>
+          <div class="sc-sub" id="d-acc">—</div>
+        </div>
+        <div class="stat-card purple loading">
+          <div class="sc-label"><span class="sc-icon">🛡️</span> Rug Detector</div>
+          <div class="sc-val sm" id="d-rug">—</div>
+          <div class="sc-sub" id="d-rugrate"></div>
+        </div>
+      </div>
+
+      <div class="grid-2-1">
+        <!-- P&L Chart -->
+        <div class="panel">
+          <div class="panel-hdr"><h3><span class="ph-icon">📈</span> P&L History</h3><span class="ph-badge" style="background:var(--gn15);color:var(--gn)" id="pnl-badge">—</span></div>
+          <div class="panel-body pad0">
+            <div class="chart-area" id="pnl-chart">
+              <div class="chart-grid"><span>0</span><span></span><span></span><span></span><span></span></div>
+              <div class="chart-bars" id="pnl-bars"></div>
+            </div>
+            <div style="padding:8px 12px;font-size:10px;color:var(--t3);display:flex;justify-content:space-between">
+              <span>Last 30 trades</span><span>Green = profit, Red = loss</span>
+            </div>
+          </div>
+        </div>
+        <!-- Quick Risk -->
+        <div class="panel">
+          <div class="panel-hdr"><h3><span class="ph-icon">⚡</span> Risk Status</h3></div>
+          <div class="panel-body">
+            <div class="metrics">
+              <div class="metric"><div class="m-label">Daily Limit</div><div class="m-val" id="r-limit">—</div></div>
+              <div class="metric"><div class="m-label">Used</div><div class="m-val" id="r-used">—</div></div>
+              <div class="metric"><div class="m-label">Max Position</div><div class="m-val" id="r-pos">—</div></div>
+              <div class="metric"><div class="m-label">Budget Left</div><div class="m-val" id="r-budget" style="color:var(--gn)">—</div></div>
+            </div>
+            <div style="margin-top:12px">
+              <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px"><span style="color:var(--t3)">Budget used</span><span id="r-pct" style="font-family:var(--mono)">0%</span></div>
+              <div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden"><div id="r-bar" style="height:100%;width:0;background:var(--gn);border-radius:2px;transition:width .5s"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Signals -->
+      <div class="panel">
+        <div class="panel-hdr"><h3><span class="ph-icon">📡</span> Recent Signals</h3><span class="ph-badge" style="background:var(--surface2);color:var(--t2)" id="d-sigcount">0</span></div>
+        <div class="panel-body pad0">
+          <div class="tbl-wrap" style="max-height:280px">
+            <table class="tbl"><thead><tr>
+              <th>Token</th><th>Signal</th><th>Confidence</th><th>Score</th><th>Time</th>
+            </tr></thead><tbody id="d-sigtable"><tr><td colspan="5" style="text-align:center;color:var(--t3);padding:20px">Waiting for signals…</td></tr></tbody></table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ TRADES PAGE ═══ -->
+    <div class="page" id="page-trades">
+      <div class="stats-row">
+        <div class="stat-card green">
+          <div class="sc-label"><span class="sc-icon">💰</span> Total Balance</div>
+          <div class="sc-val" id="t-balance">—</div>
+          <div class="sc-sub" id="t-startbal">Start: 1.000 SOL</div>
+        </div>
+        <div class="stat-card green">
+          <div class="sc-label"><span class="sc-icon">📈</span> Total P&L</div>
+          <div class="sc-val" id="t-pnl">—</div>
+          <div class="sc-sub" id="t-pnl-pct"></div>
+        </div>
+        <div class="stat-card blue">
+          <div class="sc-label"><span class="sc-icon">🎯</span> Win Rate</div>
+          <div class="sc-val" id="t-wr">—</div>
+          <div class="sc-sub" id="t-wl"></div>
+        </div>
+        <div class="stat-card orange">
+          <div class="sc-label"><span class="sc-icon">🔄</span> Total Trades</div>
+          <div class="sc-val" id="t-total">—</div>
+          <div class="sc-sub" id="t-avgsize"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-hdr"><h3><span class="ph-icon">📋</span> Trade History</h3><span class="ph-badge" style="background:var(--surface2);color:var(--t2)" id="t-count">0</span></div>
+        <div class="panel-body pad0">
+          <div class="tbl-wrap" style="max-height:500px">
+            <table class="tbl"><thead><tr>
+              <th>#</th><th>Token</th><th>Side</th><th>Amount (SOL)</th><th>P&L</th><th>Outcome</th><th>Time</th>
+            </tr></thead><tbody id="t-table"><tr><td colspan="7" style="text-align:center;color:var(--t3);padding:30px">No trades yet — start paper trading to see history</td></tr></tbody></table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ SIGNALS PAGE ═══ -->
+    <div class="page" id="page-signals">
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-hdr"><h3><span class="ph-icon">📊</span> Signal Distribution</h3></div>
+          <div class="panel-body">
+            <div class="metrics">
+              <div class="metric"><div class="m-label">Buy Signals</div><div class="m-val" style="color:var(--gn)" id="s-buys">—</div></div>
+              <div class="metric"><div class="m-label">Sell Signals</div><div class="m-val" style="color:var(--rd)" id="s-sells">—</div></div>
+              <div class="metric"><div class="m-label">Avg Confidence</div><div class="m-val" id="s-avgconf">—</div></div>
+              <div class="metric"><div class="m-label">High Conf (&gt;70%)</div><div class="m-val" style="color:var(--gn)" id="s-highconf">—</div></div>
+            </div>
+            <div style="margin-top:12px">
+              <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px"><span style="color:var(--t3)">Buy vs Sell ratio</span></div>
+              <div style="display:flex;height:8px;border-radius:4px;overflow:hidden">
+                <div id="s-buybar" style="background:var(--gn);width:50%;transition:width .5s"></div>
+                <div id="s-sellbar" style="background:var(--rd);width:50%;transition:width .5s"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-hdr"><h3><span class="ph-icon">⏱️</span> Signal Frequency</h3></div>
+          <div class="panel-body">
+            <div class="chart-area" id="freq-chart" style="height:120px">
+              <div class="chart-grid"><span></span><span></span><span></span></div>
+              <div class="chart-bars" id="freq-bars"></div>
+            </div>
+            <div style="padding:8px 0;font-size:10px;color:var(--t3)">Signals per interval (last 24h)</div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-hdr"><h3><span class="ph-icon">📡</span> All Signals</h3><span class="ph-badge" style="background:var(--surface2);color:var(--t2)" id="s-total">0</span></div>
+        <div class="panel-body pad0">
+          <div class="tbl-wrap" style="max-height:400px">
+            <table class="tbl"><thead><tr>
+              <th>Token</th><th>Action</th><th>Confidence</th><th>Score</th><th>Features</th><th>Time</th>
+            </tr></thead><tbody id="s-table"><tr><td colspan="6" style="text-align:center;color:var(--t3);padding:30px">Waiting for signals…</td></tr></tbody></table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ MODEL PAGE ═══ -->
+    <div class="page" id="page-model">
+      <div class="stats-row">
+        <div class="stat-card blue">
+          <div class="sc-label"><span class="sc-icon">🧠</span> Version</div>
+          <div class="sc-val" id="m-ver">—</div>
+          <div class="sc-sub" id="m-type">XGBoost v12</div>
+        </div>
+        <div class="stat-card green">
+          <div class="sc-label"><span class="sc-icon">📊</span> Accuracy</div>
+          <div class="sc-val" id="m-acc">—</div>
+          <div class="sc-sub" id="m-samples"></div>
+        </div>
+        <div class="stat-card orange">
+          <div class="sc-label"><span class="sc-icon">🎯</span> Precision</div>
+          <div class="sc-val" id="m-prec">—</div>
+        </div>
+        <div class="stat-card red">
+          <div class="sc-label"><span class="sc-icon">🔍</span> Recall</div>
+          <div class="sc-val" id="m-rec">—</div>
+          <div class="sc-sub" id="m-f1"></div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-hdr"><h3><span class="ph-icon">📊</span> Training Progress</h3></div>
+          <div class="panel-body">
+            <div class="metrics">
+              <div class="metric"><div class="m-label">Training Samples</div><div class="m-val" id="m-tsamples">—</div></div>
+              <div class="metric"><div class="m-label">Target (50K)</div><div class="m-val" style="color:var(--t3)">50,000</div></div>
+              <div class="metric"><div class="m-label">Progress</div><div class="m-val" id="m-progress">—</div></div>
+              <div class="metric"><div class="m-label">Win Rate (Traded)</div><div class="m-val" id="m-wr">—</div></div>
+            </div>
+            <div style="margin-top:12px">
+              <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px"><span style="color:var(--t3)">Sample collection</span><span id="m-pct" style="font-family:var(--mono)">0%</span></div>
+              <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div id="m-bar" style="height:100%;width:0;background:var(--bl);border-radius:3px;transition:width .8s"></div></div>
+              <div style="margin-top:8px;font-size:10px;color:var(--t3)">⚠️ 50K+ samples needed before live trading</div>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-hdr"><h3><span class="ph-icon">⚖️</span> Win Rate Comparison</h3></div>
+          <div class="panel-body">
+            <div style="margin-bottom:16px">
+              <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px"><span style="color:var(--t2)">Traded</span><span id="m-wrt" style="font-family:var(--mono)">0%</span></div>
+              <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden"><div id="m-wrtbar" style="height:100%;width:0;background:var(--gn);border-radius:4px;transition:width .5s"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px"><span style="color:var(--t2)">Counterfactual</span><span id="m-wrc" style="font-family:var(--mono)">0%</span></div>
+              <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden"><div id="m-wrcbar" style="height:100%;width:0;background:var(--bl);border-radius:4px;transition:width .5s"></div></div>
+            </div>
+            <div style="margin-top:12px;font-size:10px;color:var(--t3)">Traded = actual executed trades. Counterfactual = would-have-been outcomes on skipped tokens.</div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-hdr"><h3><span class="ph-icon">🎯</span> Feature Importance (Top 10)</h3></div>
+        <div class="panel-body" id="m-features">
+          <div class="empty"><div class="e-icon">📊</div>Feature importance data loading…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ RUG DETECTOR PAGE ═══ -->
+    <div class="page" id="page-rug">
+      <div class="stats-row">
+        <div class="stat-card green">
+          <div class="sc-label"><span class="sc-icon">✅</span> Safe Tokens</div>
+          <div class="sc-val" id="rg-safe">—</div>
+        </div>
+        <div class="stat-card red">
+          <div class="sc-label"><span class="sc-icon">🚨</span> Rugs Caught</div>
+          <div class="sc-val" id="rg-caught">—</div>
+        </div>
+        <div class="stat-card blue">
+          <div class="sc-label"><span class="sc-icon">👁️</span> Total Scanned</div>
+          <div class="sc-val" id="rg-total">—</div>
+        </div>
+        <div class="stat-card orange">
+          <div class="sc-label"><span class="sc-icon">⚡</span> Detection Rate</div>
+          <div class="sc-val" id="rg-rate">—</div>
+          <div class="sc-sub" id="rg-far"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-hdr"><h3><span class="ph-icon">🛡️</span> Detection Distribution</h3></div>
+        <div class="panel-body">
+          <div style="display:flex;height:40px;border-radius:var(--radius);overflow:hidden;margin-bottom:12px">
+            <div id="rg-safebar" style="background:var(--gn);width:80%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;transition:width .5s">Safe</div>
+            <div id="rg-rugbar" style="background:var(--rd);width:20%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;transition:width .5s">Rug</div>
+          </div>
+          <div style="font-size:10px;color:var(--t3)">Model: XGBoost ONNX · 33 features · F1=0.95 @ optimal threshold · 94.7% precision on MemeTrans validation</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-hdr"><h3><span class="ph-icon">📋</span> Top Predictive Features</h3></div>
+        <div class="panel-body">
+          <div id="rg-feats" style="font-size:12px">
+            <div class="metrics">
+              <div class="metric"><div class="m-label">top10_to_top100</div><div class="m-val" style="color:var(--gn)">39.76</div></div>
+              <div class="metric"><div class="m-label">cluster_num</div><div class="m-val" style="color:var(--gn)">10.31</div></div>
+              <div class="metric"><div class="m-label">time_span</div><div class="m-val">6.20</div></div>
+              <div class="metric"><div class="m-label">avg_buy_vol</div><div class="m-val">4.60</div></div>
+              <div class="metric"><div class="m-label">cluster_total_pct</div><div class="m-val">4.10</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ PERFORMANCE PAGE ═══ -->
+    <div class="page" id="page-performance">
+      <div class="stats-row">
+        <div class="stat-card green">
+          <div class="sc-label"><span class="sc-icon">📈</span> Sharpe Ratio</div>
+          <div class="sc-val" id="pf-sharpe">—</div>
+          <div class="sc-sub">Target: &gt; 1.5</div>
+        </div>
+        <div class="stat-card orange">
+          <div class="sc-label"><span class="sc-icon">📉</span> Sortino Ratio</div>
+          <div class="sc-val" id="pf-sortino">—</div>
+          <div class="sc-sub">Target: &gt; 2.0</div>
+        </div>
+        <div class="stat-card blue">
+          <div class="sc-label"><span class="sc-icon">💰</span> Profit Factor</div>
+          <div class="sc-val" id="pf-pf">—</div>
+          <div class="sc-sub">Target: &gt; 1.5</div>
+        </div>
+        <div class="stat-card purple">
+          <div class="sc-label"><span class="sc-icon">📊</span> Max Drawdown</div>
+          <div class="sc-val" id="pf-dd">—</div>
+          <div class="sc-sub">Target: &lt; 10%</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-hdr"><h3><span class="ph-icon">📈</span> Equity Curve</h3></div>
+        <div class="panel-body pad0">
+          <div class="chart-area" id="equity-chart" style="height:200px">
+            <div class="chart-grid"><span>0</span><span></span><span></span><span></span><span></span><span></span></div>
+            <div class="chart-bars" id="equity-bars"></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-hdr"><h3><span class="ph-icon">📋</span> Performance Metrics</h3></div>
+        <div class="panel-body">
+          <div class="metrics" id="pf-metrics">
+            <div class="metric"><div class="m-label">Total Return</div><div class="m-val" id="pf-ret">—</div></div>
+            <div class="metric"><div class="m-label">Avg Win</div><div class="m-val" style="color:var(--gn)" id="pf-avgw">—</div></div>
+            <div class="metric"><div class="m-label">Avg Loss</div><div class="m-val" style="color:var(--rd)" id="pf-avgl">—</div></div>
+            <div class="metric"><div class="m-label">Best Trade</div><div class="m-val" style="color:var(--gn)" id="pf-best">—</div></div>
+            <div class="metric"><div class="m-label">Worst Trade</div><div class="m-val" style="color:var(--rd)" id="pf-worst">—</div></div>
+            <div class="metric"><div class="m-label">Avg Hold Time</div><div class="m-val" id="pf-hold">—</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ CONTROLS PAGE ═══ -->
+    <div class="page" id="page-controls">
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-hdr"><h3><span class="ph-icon">⚙️</span> Trading Configuration</h3></div>
+          <div class="panel-body" id="ctrl-config">
+            <div class="empty"><div class="e-icon">⚙️</div>Loading config…</div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-hdr"><h3><span class="ph-icon">🛡️</span> Risk Parameters</h3></div>
+          <div class="panel-body" id="ctrl-risk">
+            <div class="empty"><div class="e-icon">🛡️</div>Loading risk config…</div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-hdr"><h3><span class="ph-icon">🔴</span> Kill Switch</h3></div>
+        <div class="panel-body">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+            <div>
+              <div style="font-size:13px;font-weight:500">Emergency Stop</div>
+              <div style="font-size:11px;color:var(--t3);margin-top:2px">Immediately halts all trading activity</div>
+            </div>
+            <button class="btn danger" onclick="alert('Kill switch requires API endpoint')">🛑 Activate Kill Switch</button>
+          </div>
+          <div style="padding:10px;background:var(--rd15);border-radius:var(--radius-sm);font-size:11px;color:var(--t2)">
+            ⚠️ Kill switch triggers when win rate drops below 35%. Current threshold: <strong style="color:var(--t1)">35%</strong> — model recall is <strong style="color:var(--or)">32%</strong> (too close).
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-hdr"><h3><span class="ph-icon">🖥️</span> System Health</h3></div>
+        <div class="panel-body">
+          <div id="ctrl-health" style="display:flex;flex-wrap:wrap;gap:8px">
+            <div class="empty" style="flex:1"><div class="e-icon">🖥️</div>Loading health status…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ LOGS PAGE ═══ -->
+    <div class="page" id="page-logs">
+      <div class="panel">
+        <div class="panel-hdr"><h3><span class="ph-icon">📝</span> System Log</h3><div class="ph-right"><button class="btn sm" onclick="clearLogs()">Clear</button></div></div>
+        <div class="panel-body pad0">
+          <div class="tbl-wrap" style="max-height:600px">
+            <div class="log" id="log-feed">
+              <div class="entry"><span class="ts">--:--:--</span><span class="lvl info">INFO</span><span class="msg">WebUI initialized. Waiting for data…</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
-<div class="ftr"><span class="a" id="au">localhost:8082</span> · <span id="up">—</span> · 5s</div>
+
 <script>
-const A=location.hostname==='localhost'||!location.hostname?'http://127.0.0.1:8082':location.origin;
-const $=id=>document.getElementById(id);
-const ck=()=>{$('ck').textContent=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'})};
-setInterval(ck,1000);ck();
-const S={sigs:[],t0:Date.now()};
-async function g(u){try{return await fetch(u,{signal:AbortSignal.timeout(3000)}).then(r=>r.json())}catch(e){return null}}
-async function fH(){
-  const d=await g(A+'/health');if(!d){$('sd').className='dot off';$('hl').innerHTML='<li><div class="i" style="background:var(--rd)"></div><span class="n">unreachable</span></li>';return}
-  const ok=d.ready&&d.hotpath_connected;
-  $('sd').className=ok?'dot':'dot off';
-  $('mt').textContent=d.paper_mode?'paper':'live';
-  $('mt').className=d.paper_mode?'tag tag-paper':'tag tag-live';
-  $('em').textContent=d.execution_mode||d.autotrader_state||'—';
-  [{n:'API',o:true},{n:'HotPath',o:!!d.hotpath_connected},{n:'Ready',o:!!d.ready},{n:'Trader',o:!!d.autotrader_enabled}]
-  .forEach(i=>$('hl').innerHTML+=`<li><div class="i" style="background:${i.o?'var(--gn)':'var(--rd)'}"></div><span class="n">${i.n}</span></li>`);
-  $('hl').querySelector('.i[style*=t3]')?.parentElement?.remove();
+// ═══ CONFIG ═══
+const API = location.hostname === 'localhost' || !location.hostname || location.hostname === 'nasrsalman030.github.io'
+  ? 'http://127.0.0.1:8082' : location.origin;
+const REFRESH_MS = 5000;
+const $ = id => document.getElementById(id);
+const T0 = Date.now();
+const STATE = {
+  connected: false, paperMode: true,
+  signals: [], trades: [], logs: [],
+  pnlHistory: [], equityHistory: [],
+  lastRefresh: 0
+};
+
+// ═══ NAVIGATION ═══
+function nav(el) {
+  const page = el.dataset.page;
+  document.querySelectorAll('.sb-item').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const target = $('page-' + page);
+  if (target) { target.classList.add('active'); target.classList.add('fade-in'); }
+  $('page-title').textContent = el.textContent.trim();
+  // Close mobile sidebar
+  document.querySelector('.sb').classList.remove('open');
 }
-async function fM(){
-  const[t,a,l]=await Promise.all([g(A+'/telemetry/stats'),g(A+'/autotrader/status'),g(A+'/learning/metrics')]);
-  const m=v=>v!=null;
-  if(a){
-    if(m(a.win_rate)){$('wr').textContent=(a.win_rate*100).toFixed(1)+'%'}
-    if(m(a.paper_pnl)){const p=a.paper_pnl;$('wr').insertAdjacentHTML('afterend','')}
-  }
-  if(t){
-    if(m(t.observations_24h))$('ob').textContent=t.observations_24h.toLocaleString();
-    if(m(t.training_samples))$('sa').textContent=t.training_samples.toLocaleString();
-    if(m(t.model_accuracy))$('ac').textContent=(t.model_accuracy*100).toFixed(0)+'%';
-    if(t.model_version)$('mv').textContent=t.model_version;
-    if(m(t.precision))$('pr').textContent=(t.precision*100).toFixed(1)+'%';
-    if(m(t.recall))$('rc').textContent=(t.recall*100).toFixed(1)+'%';
-    if(m(t.f1_score))$('f1').textContent=(t.f1_score*100).toFixed(1)+'%';
-    if(m(t.model_samples))$('ms').textContent=t.model_samples.toLocaleString();
-    if(m(t.win_rate_traded)){$('wt').textContent=(t.win_rate_traded*100).toFixed(0)+'%';$('wb').style.width=(t.win_rate_traded*100)+'%'}
-    if(m(t.win_rate_counterfactual)){$('wc').textContent=(t.win_rate_counterfactual*100).toFixed(0)+'%';$('cb').style.width=(t.win_rate_counterfactual*100)+'%'}
-  }
-  if(l){
-    if(m(l.observation_count_24h))$('ob').textContent=l.observation_count_24h.toLocaleString();
-    if(m(l.training_sample_count))$('sa').textContent=l.training_sample_count.toLocaleString();
-    if(m(l.model_accuracy))$('ac').textContent=(l.model_accuracy*100).toFixed(0)+'%';
-    if(m(l.win_rate_traded)){$('wt').textContent=(l.win_rate_traded*100).toFixed(0)+'%';$('wb').style.width=(l.win_rate_traded*100)+'%'}
-    if(m(l.win_rate_counterfactual)){$('wc').textContent=(l.win_rate_counterfactual*100).toFixed(0)+'%';$('cb').style.width=(l.win_rate_counterfactual*100)+'%'}
-  }
-  const u=Math.floor((Date.now()-S.t0)/1000);
-  $('up').textContent='up '+(u<60?u+'s':u<3600?Math.floor(u/60)+'m':Math.floor(u/3600)+'h');
+
+// ═══ CLOCK ═══
+function updateClock() {
+  $('clock').textContent = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
-async function fR(){const d=await g(A+'/rug/stats');if(!d)return;
-  $('rt').textContent=(d.tokens_scanned||d.total||0).toLocaleString();
-  $('rg').textContent=(d.rugs_caught||d.caught||0).toLocaleString();
-  $('rs').textContent=(d.safe_passed||d.safe||0).toLocaleString();
-  $('rf').textContent=(d.false_alarm_rate||d.far||0).toFixed(1)+'%';
-  const r=d.detection_rate||d.recall||0;$('rb').style.width=(r*100)+'%';
+setInterval(updateClock, 1000); updateClock();
+
+// ═══ API HELPER ═══
+async function api(url) {
+  try {
+    const r = await fetch(API + url, { signal: AbortSignal.timeout(4000) });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch { return null; }
 }
-async function fS(){
-  const d=await g(A+'/autotrader/recent-signals');if(!Array.isArray(d)||!d.length)return;
-  const ex=new Set(S.sigs.map(s=>s.token||s.id));
-  d.forEach(s=>{const id=s.token||s.id;if(!ex.has(id)){S.sigs.unshift(s);ex.add(id)}});
-  S.sigs=S.sigs.slice(0,50);$('sc').textContent=S.sigs.length;
-  $('sf').innerHTML=S.sigs.map(s=>{
-    const c=(s.confidence||s.score||0)*100,b=s.action==='buy'||s.signal==='buy';
-    return`<div class="sg"><span class="tk" title="${s.token||''}">${(s.token||s.name||'???').slice(0,8)}</span><span class="cf" style="background:${c>70?'var(--gn15)':c>50?'var(--or15)':'var(--border)'};color:${c>70?'var(--gn)':c>50?'var(--or)':'var(--t2)'}">${c.toFixed(0)}%</span><span style="color:${b?'var(--gn)':'var(--t2)'};font-size:10px">${s.action||s.signal||'—'}</span><span class="tm">${s.time||s.ts||''}</span></div>`
+
+// ═══ LOGGING ═══
+function log(msg, lvl = 'info') {
+  const ts = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const feed = $('log-feed');
+  const entry = document.createElement('div');
+  entry.className = 'entry';
+  entry.innerHTML = `<span class="ts">${ts}</span><span class="lvl ${lvl}">${lvl.toUpperCase()}</span><span class="msg">${msg}</span>`;
+  feed.prepend(entry);
+  if (feed.children.length > 200) feed.lastChild.remove();
+}
+function clearLogs() { $('log-feed').innerHTML = ''; log('Logs cleared', 'info'); }
+
+// ═══ FORMATTERS ═══
+const fmt = {
+  sol: v => typeof v === 'number' ? v.toFixed(4) + ' SOL' : '—',
+  pct: v => typeof v === 'number' ? (v * 100).toFixed(1) + '%' : '—',
+  num: v => v != null ? v.toLocaleString() : '—',
+  time: t => t ? new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—',
+  uptime: () => {
+    const s = Math.floor((Date.now() - T0) / 1000);
+    return s < 60 ? s + 's' : s < 3600 ? Math.floor(s / 60) + 'm ' + (s % 60) + 's' : Math.floor(s / 3600) + 'h ' + Math.floor((s % 3600) / 60) + 'm';
+  },
+  confClass: c => c > 70 ? 'high' : c > 50 ? 'med' : 'low'
+};
+
+// ═══ HEALTH ═══
+async function fetchHealth() {
+  const d = await api('/health');
+  if (!d) {
+    STATE.connected = false;
+    $('status-dot').className = 'dot off';
+    $('status-text').textContent = 'disconnected';
+    log('API unreachable at ' + API, 'err');
+    return;
+  }
+  STATE.connected = true;
+  STATE.paperMode = !!d.paper_mode;
+  const ok = d.ready && d.hotpath_connected;
+  $('status-dot').className = ok ? 'dot on' : 'dot off';
+  $('status-text').textContent = ok ? 'connected' : 'degraded';
+  $('status-mode').textContent = STATE.paperMode ? 'PAPER' : 'LIVE';
+  $('status-mode').className = STATE.paperMode ? 'mode paper' : 'mode live';
+  $('sb-uptime').textContent = 'session ' + fmt.uptime();
+
+  // Health indicators
+  const checks = [
+    { n: 'API Server', o: true },
+    { n: 'HotPath gRPC', o: !!d.hotpath_connected },
+    { n: 'Ready', o: !!d.ready },
+    { n: 'AutoTrader', o: !!d.autotrader_enabled },
+  ];
+  $('ctrl-health').innerHTML = checks.map(c =>
+    `<div style="padding:6px 12px;border-radius:var(--radius-sm);background:${c.o ? 'var(--gn15)' : 'var(--rd15)'};font-size:12px;display:flex;align-items:center;gap:6px">
+      <span style="width:6px;height:6px;border-radius:50%;background:${c.o ? 'var(--gn)' : 'var(--rd)'}"></span>
+      <span>${c.n}</span>
+      <span style="margin-left:auto;font-size:10px;font-family:var(--mono);color:${c.o ? 'var(--gn)' : 'var(--rd)'}">${c.o ? 'OK' : 'DOWN'}</span>
+    </div>`
+  ).join('');
+}
+
+// ═══ TELEMETRY / METRICS ═══
+async function fetchTelemetry() {
+  const [t, a, l, w] = await Promise.allSettled([
+    api('/telemetry/stats'), api('/autotrader/status'), api('/learning/metrics'), api('/wallet')
+  ]);
+  const td = t.value, ad = a.value, ld = l.value, wd = w.value;
+  const v = val => val != null;
+
+  // Dashboard stats
+  if (td) {
+    if (v(td.observations_24h)) $('d-obs').textContent = fmt.num(td.observations_24h);
+    if (v(td.training_samples)) { $('d-samples').textContent = fmt.num(td.training_samples) + ' samples'; $('m-tsamples').textContent = fmt.num(td.training_samples); }
+    if (v(td.model_accuracy)) $('d-acc').textContent = fmt.pct(td.model_accuracy);
+    if (td.model_version) { $('d-model').textContent = td.model_version; $('m-ver').textContent = td.model_version; }
+    if (v(td.precision)) $('m-prec').textContent = fmt.pct(td.precision);
+    if (v(td.recall)) $('m-rec').textContent = fmt.pct(td.recall);
+    if (v(td.f1_score)) { const f1 = td.f1_score; $('m-f1').textContent = 'F1: ' + fmt.pct(f1); }
+    if (v(td.model_samples)) { $('m-samples').textContent = fmt.num(td.model_samples) + ' samples'; }
+    if (v(td.win_rate_traded)) { $('m-wr').textContent = fmt.pct(td.win_rate_traded); $('m-wrt').textContent = fmt.pct(td.win_rate_traded); $('m-wrtbar').style.width = (td.win_rate_traded * 100) + '%'; }
+    if (v(td.win_rate_counterfactual)) { $('m-wrc').textContent = fmt.pct(td.win_rate_counterfactual); $('m-wrcbar').style.width = (td.win_rate_counterfactual * 100) + '%'; }
+    if (v(td.win_rate)) { $('d-winrate').textContent = fmt.pct(td.win_rate); $('t-wr').textContent = fmt.pct(td.win_rate); }
+    if (v(td.precision)) { $('m-acc').textContent = fmt.pct(td.precision); }
+  }
+  if (ld) {
+    if (v(ld.observation_count_24h)) $('d-obs').textContent = fmt.num(ld.observation_count_24h);
+    if (v(ld.training_sample_count)) $('d-samples').textContent = fmt.num(ld.training_sample_count) + ' samples';
+    if (v(ld.model_accuracy)) $('d-acc').textContent = fmt.pct(ld.model_accuracy);
+    if (v(ld.win_rate_traded)) { $('m-wr').textContent = fmt.pct(ld.win_rate_traded); $('m-wrt').textContent = fmt.pct(ld.win_rate_traded); $('m-wrtbar').style.width = (ld.win_rate_traded * 100) + '%'; }
+    if (v(ld.win_rate_counterfactual)) { $('m-wrc').textContent = fmt.pct(ld.win_rate_counterfactual); $('m-wrcbar').style.width = (ld.win_rate_counterfactual * 100) + '%'; }
+  }
+
+  // Wallet
+  if (wd) {
+    const bal = wd.balance ?? wd.paper_balance ?? 1.0;
+    const pnl = wd.total_pnl ?? wd.pnl ?? 0;
+    const trades = wd.total_trades ?? wd.trade_count ?? 0;
+    const wins = wd.wins ?? 0;
+    const losses = wd.losses ?? 0;
+    $('d-balance').textContent = fmt.sol(bal);
+    $('d-pnl').innerHTML = `<span class="${pnl >= 0 ? 'up' : 'dn'}">${pnl >= 0 ? '+' : ''}${fmt.sol(pnl)}</span>`;
+    $('t-balance').textContent = fmt.sol(bal);
+    $('t-pnl').textContent = (pnl >= 0 ? '+' : '') + fmt.sol(pnl);
+    $('t-pnl').style.color = pnl >= 0 ? 'var(--gn)' : 'var(--rd)';
+    $('t-total').textContent = trades;
+    $('d-trades').textContent = trades + ' trades';
+    if (trades > 0) {
+      $('t-wl').textContent = wins + 'W / ' + losses + 'L';
+      $('t-wr').textContent = fmt.pct(wins / trades);
+      $('d-winrate').textContent = fmt.pct(wins / trades);
+      const pnlPct = ((bal - 1.0) / 1.0 * 100);
+      $('t-pnl-pct').innerHTML = `<span class="${pnlPct >= 0 ? 'up' : 'dn'}">${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(1)}% from start</span>`;
+    }
+    if (wd.trades && Array.isArray(wd.trades)) {
+      STATE.trades = wd.trades;
+      renderTrades();
+    }
+  }
+
+  // Progress bar
+  const samples = td?.training_samples || ld?.training_sample_count || 0;
+  const pct = Math.min(samples / 50000 * 100, 100);
+  $('m-progress').textContent = pct.toFixed(1) + '%';
+  $('m-pct').textContent = pct.toFixed(1) + '%';
+  $('m-bar').style.width = pct + '%';
+
+  // Performance page
+  if (td) {
+    if (v(td.sharpe_ratio)) $('pf-sharpe').textContent = td.sharpe_ratio.toFixed(2);
+    if (v(td.sortino_ratio)) $('pf-sortino').textContent = td.sortino_ratio.toFixed(2);
+    if (v(td.profit_factor)) $('pf-pf').textContent = td.profit_factor.toFixed(2);
+    if (v(td.max_drawdown)) $('pf-dd').textContent = fmt.pct(td.max_drawdown);
+    if (v(td.total_return)) $('pf-ret').textContent = fmt.pct(td.total_return);
+    if (v(td.avg_win)) $('pf-avgw').textContent = fmt.sol(td.avg_win);
+    if (v(td.avg_loss)) $('pf-avgl').textContent = fmt.sol(td.avg_loss);
+    if (v(td.best_trade)) $('pf-best').textContent = fmt.sol(td.best_trade);
+    if (v(td.worst_trade)) $('pf-worst').textContent = fmt.sol(td.worst_trade);
+  }
+}
+
+// ═══ RUG DETECTOR ═══
+async function fetchRug() {
+  const d = await api('/rug/stats');
+  if (!d) return;
+  const total = d.tokens_scanned || d.total || 0;
+  const caught = d.rugs_caught || d.caught || 0;
+  const safe = d.safe_passed || d.safe || 0;
+  const rate = d.detection_rate || 0;
+  const far = d.false_alarm_rate || d.far || 0;
+
+  $('rg-total').textContent = fmt.num(total);
+  $('rg-caught').textContent = fmt.num(caught);
+  $('rg-safe').textContent = fmt.num(safe);
+  $('rg-rate').textContent = fmt.pct(rate);
+  $('rg-far').textContent = 'False alarm: ' + far.toFixed(1) + '%';
+  $('d-rug').textContent = fmt.num(caught);
+  $('d-rugrate').textContent = fmt.pct(rate) + ' detection rate';
+
+  if (total > 0) {
+    const safePct = (safe / total * 100);
+    const rugPct = (caught / total * 100);
+    $('rg-safebar').style.width = safePct + '%';
+    $('rg-rugbar').style.width = rugPct + '%';
+  }
+}
+
+// ═══ SIGNALS ═══
+async function fetchSignals() {
+  const d = await api('/autotrader/recent-signals');
+  if (!Array.isArray(d) || !d.length) return;
+
+  const existing = new Set(STATE.signals.map(s => (s.token || s.id) + (s.time || s.ts || '')));
+  let added = 0;
+  d.forEach(s => {
+    const key = (s.token || s.id) + (s.time || s.ts || '');
+    if (!existing.has(key)) { STATE.signals.unshift(s); existing.add(key); added++; }
+  });
+  STATE.signals = STATE.signals.slice(0, 200);
+
+  if (added > 0) log(`${added} new signal(s) received`, 'info');
+
+  renderSignals();
+}
+
+function renderSignals() {
+  const sigs = STATE.signals;
+  $('signal-count').textContent = sigs.length;
+  $('d-sigcount').textContent = sigs.length;
+  $('s-total').textContent = sigs.length;
+
+  // Signal stats
+  const buys = sigs.filter(s => s.action === 'buy' || s.signal === 'buy').length;
+  const sells = sigs.length - buys;
+  const avgConf = sigs.reduce((a, s) => a + (s.confidence || s.score || 0), 0) / sigs.length;
+  const highConf = sigs.filter(s => (s.confidence || s.score || 0) > 0.7).length;
+  $('s-buys').textContent = buys;
+  $('s-sells').textContent = sells;
+  $('s-avgconf').textContent = fmt.pct(avgConf);
+  $('s-highconf').textContent = highConf;
+  if (sigs.length > 0) {
+    $('s-buybar').style.width = (buys / sigs.length * 100) + '%';
+    $('s-sellbar').style.width = (sells / sigs.length * 100) + '%';
+  }
+
+  // Dashboard signal table (last 10)
+  const dashHtml = sigs.slice(0, 10).map(s => {
+    const c = (s.confidence || s.score || 0) * 100;
+    const isBuy = s.action === 'buy' || s.signal === 'buy';
+    return `<tr>
+      <td class="token">${(s.token || s.name || '???').slice(0, 12)}</td>
+      <td class="${isBuy ? 'buy' : 'sell'}">${s.action || s.signal || '—'}</td>
+      <td><span class="conf ${fmt.confClass(c)}">${c.toFixed(0)}%</span></td>
+      <td>${(s.score || 0).toFixed(3)}</td>
+      <td style="color:var(--t3)">${fmt.time(s.time || s.ts)}</td>
+    </tr>`;
   }).join('');
+  if (dashHtml) $('d-sigtable').innerHTML = dashHtml;
+
+  // Full signal table
+  const fullHtml = sigs.map(s => {
+    const c = (s.confidence || s.score || 0) * 100;
+    const isBuy = s.action === 'buy' || s.signal === 'buy';
+    return `<tr>
+      <td class="token">${(s.token || s.name || '???').slice(0, 16)}</td>
+      <td class="${isBuy ? 'buy' : 'sell'}">${s.action || s.signal || '—'}</td>
+      <td><span class="conf ${fmt.confClass(c)}">${c.toFixed(0)}%</span></td>
+      <td>${(s.score || 0).toFixed(3)}</td>
+      <td style="color:var(--t3)">${s.features ? Object.keys(s.features).length + ' feat' : '—'}</td>
+      <td style="color:var(--t3)">${fmt.time(s.time || s.ts)}</td>
+    </tr>`;
+  }).join('');
+  if (fullHtml) $('s-table').innerHTML = fullHtml;
+
+  // Frequency chart
+  renderFreqChart(sigs);
 }
-async function fK(){
-  const d=await g(A+'/admin/config');
-  if(d){const r=d.risk||d.risk_limits||{};$('rl').textContent=(r.daily_loss_limit||r.max_daily_loss||'—')+' SOL';$('ru').textContent=(r.daily_loss_used||0).toFixed(4)+' SOL';$('rp').textContent=(r.max_position_size||r.position_limit||'—')+' SOL';
-    const p=r.daily_loss_used&&r.daily_loss_limit?Math.min(r.daily_loss_used/r.daily_loss_limit*100,100):0;$('rb2').style.width=p+'%';$('rb2').style.background=p>80?'var(--rd)':p>50?'var(--or)':'var(--gn)'}
-  else{const d2=await g(A+'/autotrader/config');if(d2){const r=d2.risk_limits||d2.risk||{};$('rl').textContent=(r.daily_loss_limit||'—')+' SOL';$('rp').textContent=(r.max_position_size||'—')+' SOL'}}
+
+function renderFreqChart(sigs) {
+  const now = Date.now();
+  const buckets = new Array(24).fill(0);
+  sigs.forEach(s => {
+    const t = new Date(s.time || s.ts || now).getTime();
+    const age = (now - t) / 3600000;
+    if (age < 24) buckets[Math.floor(age)]++;
+  });
+  const max = Math.max(...buckets, 1);
+  $('freq-bars').innerHTML = buckets.reverse().map((v, i) =>
+    `<div class="cb gn" style="height:${Math.max(v / max * 100, 2)}%" title="${v} signals"></div>`
+  ).join('');
 }
-async function go(){document.body.classList.add('rx');await Promise.allSettled([fH(),fM(),fR(),fS(),fK()]);document.body.classList.remove('rx')}
-go();setInterval(go,5000);
+
+// ═══ TRADES ═══
+function renderTrades() {
+  const trades = STATE.trades;
+  $('trade-count').textContent = trades.length;
+  $('t-count').textContent = trades.length;
+
+  if (!trades.length) return;
+
+  const html = trades.map((t, i) => {
+    const pnl = t.pnl ?? t.profit ?? 0;
+    const side = t.side || t.action || (t.type === 'sell' ? 'sell' : 'buy');
+    const isBuy = side === 'buy';
+    return `<tr>
+      <td style="color:var(--t3)">${i + 1}</td>
+      <td class="token">${(t.token || t.mint || '???').slice(0, 16)}</td>
+      <td class="${isBuy ? 'buy' : 'sell'}">${side}</td>
+      <td>${t.amount ? fmt.sol(t.amount) : '—'}</td>
+      <td style="color:${pnl >= 0 ? 'var(--gn)' : 'var(--rd)'}">${pnl >= 0 ? '+' : ''}${fmt.sol(pnl)}</td>
+      <td>${t.outcome || (pnl >= 0 ? 'win' : 'loss')}</td>
+      <td style="color:var(--t3)">${fmt.time(t.time || t.timestamp || t.ts)}</td>
+    </tr>`;
+  }).join('');
+  $('t-table').innerHTML = html;
+
+  // P&L chart
+  renderPnlChart(trades);
+  renderEquityChart(trades);
+}
+
+function renderPnlChart(trades) {
+  const pnls = trades.slice(-30).map(t => t.pnl ?? t.profit ?? 0);
+  if (!pnls.length) return;
+  const max = Math.max(...pnls.map(Math.abs), 0.001);
+  const total = pnls.reduce((a, b) => a + b, 0);
+  $('pnl-badge').textContent = (total >= 0 ? '+' : '') + total.toFixed(4) + ' SOL';
+  $('pnl-badge').style.background = total >= 0 ? 'var(--gn15)' : 'var(--rd15)';
+  $('pnl-badge').style.color = total >= 0 ? 'var(--gn)' : 'var(--rd)';
+  $('pnl-bars').innerHTML = pnls.map(p =>
+    `<div class="cb ${p >= 0 ? 'gn' : 'rd'}" style="height:${Math.max(Math.abs(p) / max * 90, 3)}%" title="${p >= 0 ? '+' : ''}${p.toFixed(4)} SOL"></div>`
+  ).join('');
+}
+
+function renderEquityChart(trades) {
+  let equity = 1.0;
+  const points = [];
+  trades.forEach(t => {
+    equity += (t.pnl ?? t.profit ?? 0);
+    points.push(equity);
+  });
+  const max = Math.max(...points, 1.01);
+  const min = Math.min(...points, 0.99);
+  const range = max - min || 0.01;
+  const last100 = points.slice(-50);
+  $('equity-bars').innerHTML = last100.map((v, i) =>
+    `<div class="cb gn" style="height:${Math.max((v - min) / range * 90, 3)}%" title="${v.toFixed(4)} SOL"></div>`
+  ).join('');
+}
+
+// ═══ CONFIG ═══
+async function fetchConfig() {
+  const d = await api('/autotrader/config');
+  if (!d) return;
+  const cfg = d.config || d;
+  const risk = cfg.risk_limits || cfg.risk || {};
+
+  // Risk page
+  if (risk.daily_loss_limit) $('r-limit').textContent = fmt.sol(risk.daily_loss_limit);
+  if (risk.daily_loss_used) $('r-used').textContent = fmt.sol(risk.daily_loss_used);
+  if (risk.max_position_size) $('r-pos').textContent = fmt.sol(risk.max_position_size);
+  if (risk.daily_loss_limit && risk.daily_loss_used) {
+    const used = risk.daily_loss_used / risk.daily_loss_limit;
+    const pct = Math.min(used * 100, 100);
+    $('r-pct').textContent = pct.toFixed(0) + '%';
+    $('r-bar').style.width = pct + '%';
+    $('r-bar').style.background = pct > 80 ? 'var(--rd)' : pct > 50 ? 'var(--or)' : 'var(--gn)';
+    $('r-budget').textContent = fmt.sol(risk.daily_loss_limit - risk.daily_loss_used);
+  }
+
+  // Controls page
+  const cfgKeys = Object.entries(cfg).filter(([k, v]) => typeof v !== 'object' || v === null);
+  const riskKeys = Object.entries(risk);
+  if (cfgKeys.length) {
+    $('ctrl-config').innerHTML = cfgKeys.map(([k, v]) =>
+      `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
+        <span style="color:var(--t2)">${k.replace(/_/g, ' ')}</span>
+        <span style="font-family:var(--mono);color:var(--t1)">${v ?? '—'}</span>
+      </div>`
+    ).join('');
+  }
+  if (riskKeys.length) {
+    $('ctrl-risk').innerHTML = riskKeys.map(([k, v]) =>
+      `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
+        <span style="color:var(--t2)">${k.replace(/_/g, ' ')}</span>
+        <span style="font-family:var(--mono);color:var(--t1)">${typeof v === 'number' ? v.toFixed(4) : (v ?? '—')}</span>
+      </div>`
+    ).join('');
+  }
+}
+
+// ═══ REFRESH ALL ═══
+async function refreshAll() {
+  document.querySelectorAll('.loading').forEach(el => el.classList.add('loading'));
+  await Promise.allSettled([fetchHealth(), fetchTelemetry(), fetchRug(), fetchSignals(), fetchConfig()]);
+  document.querySelectorAll('.loading').forEach(el => el.classList.remove('loading'));
+  STATE.lastRefresh = Date.now();
+}
+
+// ═══ INIT ═══
+log('WebUI v2.0 initialized — API: ' + API, 'ok');
+refreshAll();
+setInterval(refreshAll, REFRESH_MS);
+
+// Keyboard shortcut: R to refresh
+document.addEventListener('keydown', e => {
+  if (e.key === 'r' && !e.ctrlKey && !e.metaKey && !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+    refreshAll();
+  }
+});
 </script>
 </body>
 </html>
