@@ -1,14 +1,17 @@
 """
-2DEXY Dashboard — Live API Server
+2DEXY Dashboard — Live API Server with Control Plane
 Serves dashboard HTML + real API endpoints backed by SQLite.
-Endpoints match what the dashboard expects.
-2DEXY ColdPath can POST data here for live updates.
+Frontend controls backend state; ColdPath polls for commands.
+
+Control flow:
+  Frontend → POST /api/v1/command → stored in commands table
+  ColdPath → GET /api/v1/commands → picks up pending commands
+  ColdPath → POST /api/v1/status → updates state back to dashboard
 """
 
 import json
 import time
 import sqlite3
-import hashlib
 from datetime import datetime, timezone
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -46,6 +49,15 @@ def init_db():
             features TEXT,
             timestamp TEXT NOT NULL DEFAULT (datetime('now'))
         );
+        CREATE TABLE IF NOT EXISTS observations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            token_mint TEXT,
+            token_symbol TEXT,
+            confidence REAL DEFAULT 0,
+            fraud_score REAL DEFAULT 0,
+            status TEXT DEFAULT 'observed',
+            timestamp TEXT NOT NULL DEFAULT (datetime('now'))
+        );
         CREATE TABLE IF NOT EXISTS rug_stats (
             id INTEGER PRIMARY KEY CHECK(id = 1),
             tokens_scanned INTEGER DEFAULT 0,
@@ -63,15 +75,28 @@ def init_db():
         CREATE TABLE IF NOT EXISTS system_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             level TEXT DEFAULT 'info',
+            source TEXT DEFAULT '',
             message TEXT NOT NULL,
             timestamp TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        -- Command queue: frontend pushes, ColdPath polls
+        CREATE TABLE IF NOT EXISTS commands (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            command TEXT NOT NULL,
+            params TEXT,
+            status TEXT DEFAULT 'pending',
+            created_at TEXT DEFAULT (datetime('now')),
+            acknowledged_at TEXT,
+            completed_at TEXT,
+            result TEXT
         );
         -- Initialize config defaults
         INSERT OR IGNORE INTO config (key, value) VALUES
             ('paper_mode', 'true'),
             ('execution_mode', 'paper'),
             ('hotpath_connected', 'false'),
-            ('autotrader_enabled', 'true'),
+            ('autotrader_enabled', 'false'),
+            ('autotrader_state', 'stopped'),
             ('model_version', 'v12'),
             ('model_accuracy', '0.93'),
             ('precision', '0.84'),
@@ -84,13 +109,20 @@ def init_db():
             ('sortino_ratio', '0'),
             ('profit_factor', '0'),
             ('max_drawdown', '0'),
-            ('total_return', '0');
+            ('total_return', '0'),
+            ('daily_loss_limit', '0.5'),
+            ('daily_loss_used', '0'),
+            ('max_position_size', '0.1'),
+            ('min_liquidity', '1000'),
+            ('min_confidence', '0.6'),
+            ('connected', 'false');
         INSERT OR IGNORE INTO rug_stats (id) VALUES (1);
     ''')
     conn.commit()
     conn.close()
 
 init_db()
+
 
 # ═══ Serve Dashboard ═══
 @app.route('/')
@@ -101,7 +133,8 @@ def index():
 def favicon():
     return '', 204
 
-# ═══ Health ═══
+
+# ═══ Health (ColdPath also POSTs status here) ═══
 @app.route('/health')
 def health():
     conn = get_db()
@@ -110,21 +143,151 @@ def health():
         rs = conn.execute("SELECT * FROM rug_stats WHERE id=1").fetchone()
         trade_count = conn.execute("SELECT COUNT(*) as c FROM trades").fetchone()['c']
         signal_count = conn.execute("SELECT COUNT(*) as c FROM signals").fetchone()['c']
+        obs_count = conn.execute("SELECT COUNT(*) as c FROM observations").fetchone()['c']
+        pending = conn.execute("SELECT COUNT(*) as c FROM commands WHERE status='pending'").fetchone()['c']
     finally:
         conn.close()
 
     return jsonify({
         'ready': True,
+        'connected': cfg.get('connected', 'false') == 'true',
         'hotpath_connected': cfg.get('hotpath_connected', 'false') == 'true',
         'paper_mode': cfg.get('paper_mode', 'true') == 'true',
         'execution_mode': cfg.get('execution_mode', 'paper'),
-        'autotrader_enabled': cfg.get('autotrader_enabled', 'true') == 'true',
+        'autotrader_enabled': cfg.get('autotrader_enabled', 'false') == 'true',
+        'autotrader_state': cfg.get('autotrader_state', 'stopped'),
         'model_version': cfg.get('model_version', 'v12'),
         'uptime_seconds': int(time.time() - STARTED_AT),
         'total_trades': trade_count,
         'total_signals': signal_count,
+        'total_observations': obs_count,
+        'pending_commands': pending,
         'timestamp': datetime.now(timezone.utc).isoformat()
     })
+
+
+# ═══════════════════════════════════════════════
+# CONTROL PLANE — Frontend → ColdPath
+# ═══════════════════════════════════════════════
+
+@app.route('/api/v1/command', methods=['POST'])
+def post_command():
+    """Frontend posts a command. Stored in queue, ColdPath picks it up."""
+    d = request.json or {}
+    cmd = d.get('command')
+    if not cmd:
+        return jsonify({'error': 'missing command'}), 400
+
+    params = json.dumps(d.get('params', {})) if d.get('params') else None
+    conn = get_db()
+    try:
+        cur = conn.execute(
+            "INSERT INTO commands (command, params) VALUES (?,?)",
+            (cmd, params)
+        )
+        cmd_id = cur.lastrowid
+        conn.commit()
+    finally:
+        conn.close()
+
+    return jsonify({'ok': True, 'command_id': cmd_id, 'command': cmd}), 201
+
+
+@app.route('/api/v1/commands', methods=['GET'])
+def get_pending_commands():
+    """ColdPath polls for pending commands."""
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM commands WHERE status='pending' ORDER BY id ASC LIMIT 10"
+        ).fetchall()
+    finally:
+        conn.close()
+    return jsonify([{
+        'id': r['id'],
+        'command': r['command'],
+        'params': json.loads(r['params']) if r['params'] else None,
+        'created_at': r['created_at']
+    } for r in rows])
+
+
+@app.route('/api/v1/command/<int:cmd_id>/ack', methods=['POST'])
+def acknowledge_command(cmd_id):
+    """ColdPath acknowledges (processing) a command."""
+    conn = get_db()
+    try:
+        conn.execute(
+            "UPDATE commands SET status='acknowledged', acknowledged_at=datetime('now') WHERE id=?",
+            (cmd_id,)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/v1/command/<int:cmd_id>/complete', methods=['POST'])
+def complete_command(cmd_id):
+    """ColdPath marks command done, optionally with result."""
+    d = request.json or {}
+    conn = get_db()
+    try:
+        result = json.dumps(d.get('result')) if d.get('result') else None
+        conn.execute(
+            "UPDATE commands SET status='completed', completed_at=datetime('now'), result=? WHERE id=?",
+            (result, cmd_id)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/v1/command/history', methods=['GET'])
+def command_history():
+    """Frontend views command history."""
+    limit = min(int(request.args.get('limit', 50)), 200)
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM commands ORDER BY id DESC LIMIT ?", (limit,)
+        ).fetchall()
+    finally:
+        conn.close()
+    return jsonify([{
+        'id': r['id'],
+        'command': r['command'],
+        'params': json.loads(r['params']) if r['params'] else None,
+        'status': r['status'],
+        'created_at': r['created_at'],
+        'acknowledged_at': r.get('acknowledged_at'),
+        'completed_at': r.get('completed_at'),
+        'result': json.loads(r['result']) if r.get('result') else None,
+    } for r in rows])
+
+
+# ═══════════════════════════════════════════════
+# STATUS SYNC — ColdPath → Dashboard
+# ═══════════════════════════════════════════════
+
+@app.route('/api/v1/status', methods=['POST'])
+def update_status():
+    """ColdPath pushes full status snapshot."""
+    d = request.json or {}
+    conn = get_db()
+    try:
+        for k, v in d.items():
+            if k == 'logs':
+                continue
+            conn.execute(
+                "INSERT OR REPLACE INTO config (key, value, updated_at) VALUES (?,?,datetime('now'))",
+                (k, str(v))
+            )
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({'ok': True})
+
 
 # ═══ Wallet ═══
 @app.route('/wallet')
@@ -135,9 +298,8 @@ def wallet():
     finally:
         conn.close()
 
-    balance = 1.0  # Starting balance
-    wins = 0
-    losses = 0
+    balance = 1.0
+    wins = losses = 0
     total_pnl = 0
     trade_list = []
     for t in trades:
@@ -149,26 +311,20 @@ def wallet():
             else:
                 losses += 1
         trade_list.append({
-            'id': t['id'],
-            'token': t['token'],
-            'side': t['side'],
-            'amount': t['amount'],
-            'pnl': t['pnl'],
+            'id': t['id'], 'token': t['token'], 'side': t['side'],
+            'amount': t['amount'], 'pnl': t['pnl'],
             'outcome': t['outcome'] or ('win' if (t['pnl'] or 0) >= 0 else 'loss'),
             'time': t['timestamp']
         })
 
     return jsonify({
-        'balance': round(balance, 6),
-        'total_pnl': round(total_pnl, 6),
-        'paper_balance': round(balance, 6),
-        'total_trades': len(trades),
-        'wins': wins,
-        'losses': losses,
-        'start_balance': 1.0,
+        'balance': round(balance, 6), 'total_pnl': round(total_pnl, 6),
+        'paper_balance': round(balance, 6), 'total_trades': len(trades),
+        'wins': wins, 'losses': losses, 'start_balance': 1.0,
         'pnl_pct': round(total_pnl / 1.0 * 100, 2) if 1.0 > 0 else 0,
         'trades': trade_list
     })
+
 
 # ═══ Telemetry ═══
 @app.route('/telemetry/stats')
@@ -211,6 +367,7 @@ def telemetry():
         'worst_trade': float(min((t['pnl'] for t in trades), default=0)),
     })
 
+
 # ═══ Signals ═══
 @app.route('/autotrader/recent-signals')
 def recent_signals():
@@ -220,14 +377,28 @@ def recent_signals():
     finally:
         conn.close()
     return jsonify([{
-        'id': r['id'],
-        'token': r['token'],
-        'action': r['action'],
-        'confidence': r['confidence'],
-        'score': r['score'],
+        'id': r['id'], 'token': r['token'], 'action': r['action'],
+        'confidence': r['confidence'], 'score': r['score'],
         'features': json.loads(r['features']) if r['features'] else None,
         'time': r['timestamp']
     } for r in rows])
+
+
+# ═══ Observations ═══
+@app.route('/observations/recent')
+def recent_observations():
+    limit = min(int(request.args.get('limit', 50)), 200)
+    conn = get_db()
+    try:
+        rows = conn.execute("SELECT * FROM observations ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+    finally:
+        conn.close()
+    return jsonify([{
+        'id': r['id'], 'token_mint': r['token_mint'], 'token_symbol': r['token_symbol'],
+        'confidence': r['confidence'], 'fraud_score': r['fraud_score'],
+        'status': r['status'], 'time': r['timestamp']
+    } for r in rows])
+
 
 # ═══ Config ═══
 @app.route('/autotrader/config')
@@ -243,12 +414,16 @@ def autotrader_config():
             'daily_loss_limit': float(cfg.get('daily_loss_limit', 0.5)),
             'daily_loss_used': float(cfg.get('daily_loss_used', 0)),
             'max_position_size': float(cfg.get('max_position_size', 0.1)),
+            'min_liquidity': float(cfg.get('min_liquidity', 1000)),
+            'min_confidence': float(cfg.get('min_confidence', 0.6)),
         }
     })
+
 
 @app.route('/autotrader/status')
 def autotrader_status():
     return telemetry()
+
 
 # ═══ Rug Detector ═══
 @app.route('/rug/stats')
@@ -259,24 +434,38 @@ def rug_stats():
     finally:
         conn.close()
     return jsonify({
-        'tokens_scanned': rs['tokens_scanned'],
-        'rugs_caught': rs['rugs_caught'],
-        'safe_passed': rs['safe_passed'],
-        'total': rs['tokens_scanned'],
-        'caught': rs['rugs_caught'],
-        'safe': rs['safe_passed'],
-        'detection_rate': rs['detection_rate'],
-        'false_alarm_rate': rs['false_alarm_rate'],
+        'tokens_scanned': rs['tokens_scanned'], 'rugs_caught': rs['rugs_caught'],
+        'safe_passed': rs['safe_passed'], 'total': rs['tokens_scanned'],
+        'caught': rs['rugs_caught'], 'safe': rs['safe_passed'],
+        'detection_rate': rs['detection_rate'], 'false_alarm_rate': rs['false_alarm_rate'],
         'last_updated': rs['last_updated']
     })
+
 
 # ═══ Logs ═══
 @app.route('/learning/metrics')
 def learning_metrics():
     return telemetry()
 
+
+@app.route('/api/v1/logs', methods=['GET'])
+def get_logs():
+    limit = min(int(request.args.get('limit', 100)), 500)
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM system_logs ORDER BY id DESC LIMIT ?", (limit,)
+        ).fetchall()
+    finally:
+        conn.close()
+    return jsonify([{
+        'level': r['level'], 'source': r['source'],
+        'message': r['message'], 'time': r['timestamp']
+    } for r in rows])
+
+
 # ═══════════════════════════════════════════════
-# INGESTION ENDPOINTS — 2DEXY posts data here
+# INGESTION ENDPOINTS — 2DEXY pushes data here
 # ═══════════════════════════════════════════════
 
 @app.route('/api/v1/signal', methods=['POST'])
@@ -286,13 +475,15 @@ def ingest_signal():
     try:
         conn.execute(
             "INSERT INTO signals (token, action, confidence, score, features) VALUES (?,?,?,?,?)",
-            (d.get('token','?'), d.get('action','buy'), d.get('confidence',0), d.get('score',0),
+            (d.get('token', d.get('token_mint', '?')), d.get('action', 'buy'),
+             d.get('confidence', 0), d.get('score', 0),
              json.dumps(d.get('features')) if d.get('features') else None)
         )
         conn.commit()
     finally:
         conn.close()
     return jsonify({'ok': True}), 201
+
 
 @app.route('/api/v1/trade', methods=['POST'])
 def ingest_trade():
@@ -301,65 +492,78 @@ def ingest_trade():
     try:
         conn.execute(
             "INSERT INTO trades (token, side, amount, pnl, outcome) VALUES (?,?,?,?,?)",
-            (d.get('token','?'), d.get('side','buy'), d.get('amount',0), d.get('pnl',0), d.get('outcome'))
+            (d.get('token', d.get('token_mint', '?')), d.get('side', 'buy'),
+             d.get('amount', d.get('position_size_sol', 0)),
+             d.get('pnl', d.get('pnl_sol', 0)), d.get('outcome'))
         )
         conn.commit()
     finally:
         conn.close()
     return jsonify({'ok': True}), 201
+
+
+@app.route('/api/v1/observation', methods=['POST'])
+def ingest_observation():
+    d = request.json or {}
+    conn = get_db()
+    try:
+        conn.execute(
+            "INSERT INTO observations (token_mint, token_symbol, confidence, fraud_score, status) VALUES (?,?,?,?,?)",
+            (d.get('token_mint', ''), d.get('token_symbol', ''),
+             d.get('confidence', 0), d.get('fraud_score', 0), d.get('status', 'observed'))
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({'ok': True}), 201
+
 
 @app.route('/api/v1/rug-stats', methods=['POST'])
 def ingest_rug_stats():
     d = request.json or {}
     conn = get_db()
     try:
-        conn.execute("""UPDATE rug_stats SET
-            tokens_scanned=?, rugs_caught=?, safe_passed=?,
-            detection_rate=?, false_alarm_rate=?, last_updated=datetime('now')
-            WHERE id=1""",
-            (d.get('tokens_scanned',0), d.get('rugs_caught',0), d.get('safe_passed',0),
-             d.get('detection_rate',0), d.get('false_alarm_rate',0))
-        )
+        if d.get('is_rug'):
+            conn.execute("UPDATE rug_stats SET rugs_caught = rugs_caught + 1, last_updated=datetime('now') WHERE id=1")
+        else:
+            conn.execute("UPDATE rug_stats SET safe_passed = safe_passed + 1, last_updated=datetime('now') WHERE id=1")
+        conn.execute("UPDATE rug_stats SET tokens_scanned = tokens_scanned + 1, detection_rate = CAST(rugs_caught AS REAL) / tokens_scanned WHERE id=1")
         conn.commit()
     finally:
         conn.close()
     return jsonify({'ok': True}), 201
 
+
 @app.route('/api/v1/telemetry', methods=['POST'])
 def ingest_telemetry():
-    """Bulk update config/telemetry values from 2DEXY."""
     d = request.json or {}
     conn = get_db()
     try:
         for k, v in d.items():
-            conn.execute("INSERT OR REPLACE INTO config (key, value, updated_at) VALUES (?,?,datetime('now'))",
-                        (k, str(v)))
+            conn.execute(
+                "INSERT OR REPLACE INTO config (key, value, updated_at) VALUES (?,?,datetime('now'))",
+                (k, str(v))
+            )
         conn.commit()
     finally:
         conn.close()
     return jsonify({'ok': True}), 201
+
 
 @app.route('/api/v1/log', methods=['POST'])
 def ingest_log():
     d = request.json or {}
     conn = get_db()
     try:
-        conn.execute("INSERT INTO system_logs (level, message) VALUES (?,?)",
-                    (d.get('level','info'), d.get('message','')))
+        conn.execute(
+            "INSERT INTO system_logs (level, source, message) VALUES (?,?,?)",
+            (d.get('level', 'info'), d.get('source', ''), d.get('message', ''))
+        )
         conn.commit()
     finally:
         conn.close()
     return jsonify({'ok': True}), 201
 
-@app.route('/api/v1/logs', methods=['GET'])
-def get_logs():
-    limit = min(int(request.args.get('limit', 100)), 500)
-    conn = get_db()
-    try:
-        rows = conn.execute("SELECT * FROM system_logs ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
-    finally:
-        conn.close()
-    return jsonify([{'level': r['level'], 'message': r['message'], 'time': r['timestamp']} for r in rows])
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
